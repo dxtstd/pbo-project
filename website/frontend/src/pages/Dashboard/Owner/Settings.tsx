@@ -1,0 +1,90 @@
+import { useEffect, useRef, useState } from "react";
+import { useOutletContext } from "react-router-dom";
+import QRCode from "qrcode";
+import { API_URL, authHeaders } from "../../../config";
+import type { OwnerData } from "./types";
+
+type Context = { data: OwnerData; refresh: () => Promise<void>; setMessage: (message: string) => void };
+type NotificationStatus = { status: string; qr?: string; pairedNumber?: string };
+
+export function OwnerSettings() {
+  const { setMessage } = useOutletContext<Context>();
+  const [status, setStatus] = useState<NotificationStatus>();
+  const [loading, setLoading] = useState(true);
+  const [testPhone, setTestPhone] = useState("");
+  const qrCanvas = useRef<HTMLCanvasElement>(null);
+  const ownerId = localStorage.getItem("userId");
+
+  useEffect(() => {
+    const checkStatus = () => {
+      void fetch(`${API_URL}/dashboard/owner/${ownerId}/notification`, { headers: authHeaders() })
+        .then(async (response) => {
+          if (response.ok) setStatus(await response.json() as NotificationStatus);
+          else setMessage("Status WhatsApp tidak dapat dimuat.");
+          setLoading(false);
+        })
+        .catch(() => {
+          setMessage("Notification service tidak tersedia.");
+          setLoading(false);
+        });
+    };
+    const initialCheck = window.setTimeout(checkStatus, 0);
+    const timer = window.setInterval(checkStatus, 3000);
+    return () => {
+      window.clearTimeout(initialCheck);
+      window.clearInterval(timer);
+    };
+  }, [ownerId, setMessage]);
+
+  useEffect(() => {
+    if (!status?.qr || !qrCanvas.current) return;
+    void QRCode.toCanvas(qrCanvas.current, status.qr, {
+      width: 260,
+      margin: 2,
+      color: { dark: "#3e2f28", light: "#fffaf5" },
+    }).catch(() => setMessage("QR WhatsApp gagal dibuat."));
+  }, [status?.qr, setMessage]);
+
+  const startPairing = async () => {
+    if (!ownerId) return;
+    setLoading(true);
+    const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/notification/pair`, { method: "POST", headers: authHeaders() });
+    if (response.ok) {
+      setStatus(await response.json() as NotificationStatus);
+      setMessage("Permintaan pairing dikirim. Scan QR WhatsApp di bawah.");
+    } else setMessage("Pairing WhatsApp gagal dimulai.");
+    setLoading(false);
+  };
+
+  const sendTestNotification = async (scenario: "cash_request" | "transaction_success") => {
+    if (!ownerId) return;
+    const phone = testPhone.replace(/\D/g, "");
+    if (phone.length < 10 || phone.length > 15) {
+      setMessage("Masukkan nomor WhatsApp yang valid, termasuk kode negara.");
+      return;
+    }
+    setLoading(true);
+    const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/notification/test`, {
+      method: "POST",
+      headers: { ...authHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ recipient: phone, scenario }),
+    });
+    const result = await response.json().catch(() => ({})) as { message?: string };
+    setMessage(response.ok ? `Notifikasi tes berhasil dikirim ke ${phone}.` : result.message || "Notifikasi tes gagal dikirim. Pastikan WhatsApp sudah terhubung.");
+    setLoading(false);
+  };
+
+  return <>
+    <div><h2 className="text-2xl font-bold">Pengaturan notifikasi</h2><p className="text-sm text-[#765e52]">Hubungkan WhatsApp untuk menerima pengingat tagihan dan notifikasi pembayaran.</p></div>
+    <section className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)]">
+      <div className="rounded-2xl border border-[#d7b9a9] bg-[#fffaf5] p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-lg font-bold">Pairing WhatsApp</h3><p className="mt-1 text-sm text-[#765e52]">Mulai pairing dari sini, lalu scan QR menggunakan WhatsApp.</p></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${status?.status === "open" ? "bg-[#d9ead7] text-[#315c32]" : "bg-[#ead0c2] text-[#694536]"}`}>{status?.status === "open" ? "Terhubung" : status?.status || "Memeriksa..."}</span></div>
+        <label className="mt-6 block text-sm font-semibold">Nomor tujuan notifikasi tes<input type="text" inputMode="tel" value={testPhone} onChange={(event) => setTestPhone(event.target.value)} placeholder="628123456789" className="mt-2 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2 outline-none focus:border-[#694536]" /><span className="mt-1 block text-xs font-normal text-[#765e52]">Gunakan kode negara, contoh: 628123456789.</span></label>
+        <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => void startPairing()} disabled={loading} className="rounded-lg bg-[#694536] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{loading ? "Menghubungkan..." : "Minta pairing baru"}</button><button type="button" onClick={() => void sendTestNotification("cash_request")} disabled={loading || status?.status !== "open" || !testPhone.trim()} className="rounded-lg border border-[#caa897] px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50">Tes request cash</button><button type="button" onClick={() => void sendTestNotification("transaction_success")} disabled={loading || status?.status !== "open" || !testPhone.trim()} className="rounded-lg border border-[#caa897] px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50">Tes transaksi berhasil</button></div>
+        {status?.pairedNumber && <p className="mt-4 text-sm text-[#765e52]">Nomor terhubung: <b>{status.pairedNumber}</b></p>}
+      </div>
+      <div className="rounded-2xl border border-[#d7b9a9] bg-[#fffaf5] p-5 text-center sm:p-6"><h3 className="text-lg font-bold">QR WhatsApp</h3>{status?.qr ? <><div className="mx-auto mt-4 flex min-h-[276px] items-center justify-center rounded-xl bg-white p-2"><canvas ref={qrCanvas} aria-label="QR code WhatsApp pairing" className="max-w-full" /></div><p className="mt-3 text-xs text-[#765e52]">Scan QR ini dengan WhatsApp. QR diperbarui otomatis setiap beberapa detik.</p></> : <div className="mt-4 rounded-xl border border-dashed border-[#caa897] p-10 text-sm text-[#765e52]">{status?.status === "open" ? "WhatsApp sudah terhubung." : "Klik Minta pairing baru untuk menampilkan QR."}</div>}</div>
+    </section>
+    <section className="mt-5 rounded-2xl border border-[#d7b9a9] bg-[#fffaf5] p-5 sm:p-6"><h3 className="font-bold">Notifikasi yang aktif</h3><div className="mt-4 grid gap-3 text-sm sm:grid-cols-2"><div className="rounded-xl bg-[#f8eee7] p-4"><b>Pengingat tagihan</b><p className="mt-1 text-xs text-[#765e52]">H-7 dan hari jatuh tempo</p></div><div className="rounded-xl bg-[#f8eee7] p-4"><b>Pembayaran diterima</b><p className="mt-1 text-xs text-[#765e52]">Dikirim kepada pemilik kost</p></div></div></section>
+  </>;
+}

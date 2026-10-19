@@ -1,10 +1,9 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import Customer from "../../../models/customer";
-import Owner from "../../../models/owner";
-import { config } from "../../../config/env";
-import { createToken, requireAuth } from "../../../middlewares/auth";
+import Customer from "../../../../models/customer";
+import Owner from "../../../../models/owner";
+import { config } from "../../../../config/env";
+import { createToken, requireAuth } from "../../../../middlewares/auth";
 
 const auth = Router();
 
@@ -36,6 +35,7 @@ auth.get("/me", requireAuth, async (req, res) => {
   const user = req.user;
   if (!user) return res.status(401).json({ message: "Authentication required" });
   if (user.role === "admin") return res.json({ user });
+
   const profile = user.role === "owner"
     ? await Owner.findOne({ ownerId: user.id }).select("-password").lean()
     : await Customer.findOne({ customerId: user.id }).select("-password").lean();

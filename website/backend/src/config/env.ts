@@ -11,4 +11,6 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET || "development-only-secret",
   adminEmail: process.env.ADMIN_EMAIL || "",
   adminPassword: process.env.ADMIN_PASSWORD || "",
+  notificationHttpUrl: process.env.NOTIFICATION_HTTP_URL
+    || (environment === "production" ? "http://notification:4000" : "http://localhost:4000"),
 };

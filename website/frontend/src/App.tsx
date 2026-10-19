@@ -5,6 +5,11 @@ import { Login } from './pages/Login';
 import { CustomerDashboard } from './pages/Dashboard/Customer';
 import { CustomerPayment } from './pages/Dashboard/Customer/Payment';
 import { OwnerDashboard } from './pages/Dashboard/Owner';
+import { OwnerSummary } from './pages/Dashboard/Owner/Summary';
+import { OwnerRooms } from './pages/Dashboard/Owner/Rooms';
+import { OwnerPayments } from './pages/Dashboard/Owner/Payments';
+import { OwnerReports } from './pages/Dashboard/Owner/Reports';
+import { OwnerSettings } from './pages/Dashboard/Owner/Settings';
 
 
 export default function App() {
@@ -29,7 +34,13 @@ function AppRoutes() {
           <Route path="/login" element={<Login></Login>}></Route>
           <Route path="/dashboard/customer" element={<CustomerDashboard />}></Route>
           <Route path="/dashboard/customer/payment" element={<CustomerPayment />}></Route>
-          <Route path="/dashboard/owner" element={<OwnerDashboard />}></Route>
+          <Route path="/dashboard/owner" element={<OwnerDashboard />}>
+            <Route index element={<OwnerSummary />}></Route>
+            <Route path="kamar" element={<OwnerRooms />}></Route>
+            <Route path="pembayaran" element={<OwnerPayments />}></Route>
+            <Route path="rekap" element={<OwnerReports />}></Route>
+            <Route path="pengaturan" element={<OwnerSettings />}></Route>
+          </Route>
         </Routes>
       </main>
     </>

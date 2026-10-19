@@ -1,7 +1,7 @@
 import type Customer from './customer';
 import type Owner from './owner';
 
-export type RoomType = 'standard' | 'deluxe' | 'suite';
+export type RoomType = 'small' | 'medium' | 'large';
 
 export interface RoomOptions {
   roomId: string;
