@@ -1,0 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;1,400&family=Poppins:wght@300;400;500;600&display=swap');
+
+@import 'tailwindcss';
+
+:root {
+  --bg-main: #EFE4DC;         /* Warna background krem utama */
+  --bg-card: #FAF6F0;         /* Warna background card/form */
+  --text-dark: #3E2F28;       /* Warna teks utama (cokelat tua) */
+  --text-muted: #6C5A52;      /* Warna deskripsi/subteks */
+  --btn-primary: #54372B;     /* Warna tombol cokelat tua */
+  --btn-hover: #3E281F;       /* Warna hover tombol */
+  --border-color: #D3C5B7;    /* Warna border form input */
+  --blob-color: #5C3A21;      /* Warna shape/blob di belakang gambar */
+}
+
+* {
+  box-sizing: border-box;
+  font-family: 'Poppins', sans-serif;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-dark);
+  min-height: 100vh;
+}
+
+html {
+  scroll-behavior: smooth;
+}
