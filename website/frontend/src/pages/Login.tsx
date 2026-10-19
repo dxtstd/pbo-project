@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { LoginFormData } from '../types';
 import { API_URL } from '../config';
+import { useAuthStore } from '../stores/auth';
 
 export const Login: React.FC = () => {
   const [formData, setFormData] = useState<LoginFormData>({ username: '', password: '' });
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const login = useAuthStore((state) => state.login);
 
   const handleSubmit = async () => {
     setError('');
@@ -23,9 +25,7 @@ export const Login: React.FC = () => {
         setError(result.message || 'Akun atau password salah.');
         return;
       }
-      localStorage.setItem('authToken', result.token);
-      localStorage.setItem('userId', result.user.id);
-      localStorage.setItem('userRole', result.user.role);
+      login(result.token, { ...result.user, username: formData.username });
       navigate(result.user.role === 'owner' ? '/dashboard/owner' : result.user.role === 'customer' ? '/dashboard/customer' : '/');
     } catch {
       setError('Tidak dapat terhubung ke server. Pastikan backend sedang berjalan.');

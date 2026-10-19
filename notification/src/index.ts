@@ -40,11 +40,24 @@ zapo.on("connection", ({ status }) => {
   }
 });
 
+/**
+ * Converts a user-supplied phone number into a WhatsApp JID.
+ *
+ * @param phone Phone number containing optional punctuation or country prefix.
+ * @returns WhatsApp JID in the form `<digits>@s.whatsapp.net`.
+ */
 const normalizePhone = (phone: string): string => {
   const digits = phone.replace(/\D/g, "");
   return `${digits}@s.whatsapp.net`;
 };
 
+/**
+ * Converts a WebSocket notification event into a WhatsApp message.
+ *
+ * @param event Notification event payload received from the backend bridge.
+ * @returns Promise resolved after the message is sent.
+ * @throws Error when the event has no recipient or WhatsApp delivery fails.
+ */
 const sendEvent = async (event: Record<string, unknown>): Promise<void> => {
   if (!["invoice_due", "payment_received"].includes(String(event.type))) return;
 
@@ -67,6 +80,13 @@ const sendEvent = async (event: Record<string, unknown>): Promise<void> => {
   await zapo.message.send(normalizePhone(recipient), message);
 };
 
+/**
+ * Sends a manually requested notification test message.
+ *
+ * @param body JSON request body containing `recipient` and `message`.
+ * @returns Promise resolved after the test message is sent.
+ * @throws Error when the payload is invalid or WhatsApp is disconnected.
+ */
 const sendTestMessage = async (body: string): Promise<void> => {
   const payload = JSON.parse(body) as { recipient?: string; message?: string };
   if (!payload.recipient || !payload.message) throw new Error("Test notification requires recipient and message");
