@@ -1,0 +1,14 @@
+{
+  "name": "backend",
+  "projectType": "application",
+  "sourceRoot": "website/backend/src",
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm run dev",
+        "cwd": "website/backend"
+      }
+    }
+  }
+}

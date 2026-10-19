@@ -1,0 +1,66 @@
+services:
+  nginx:
+    image: nginx:1.29-alpine
+    depends_on:
+      - frontend
+      - backend
+      - notification
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./docker/nginx/default.dev.conf:/etc/nginx/conf.d/default.conf:ro
+
+  frontend:
+    build:
+      context: ./website/frontend
+      dockerfile: Dockerfile.dev
+    env_file:
+      - ./website/frontend/.env.development
+    volumes:
+      - ./website/frontend:/app
+      - frontend-node-modules:/app/node_modules
+    expose:
+      - "5173"
+
+  backend:
+    build:
+      context: ./website/backend
+      dockerfile: Dockerfile.dev
+    env_file:
+      - ./website/backend/.env.development
+    environment:
+      MONGO_URI: mongodb://mongodb:27017/kost_db
+      NOTIFICATION_WS_URL: ws://notification:4000
+    depends_on:
+      - mongodb
+    volumes:
+      - ./website/backend/src:/app/src
+      - ./website/backend/template:/app/template
+      - backend-node-modules:/app/node_modules
+    expose:
+      - "3000"
+
+  notification:
+    build:
+      context: ./notification
+      dockerfile: Dockerfile.dev
+    env_file:
+      - ./notification/.env.development
+    environment:
+      ZAPO_SESSION_ID: ${ZAPO_SESSION_ID:-kost-notification-dev}
+    volumes:
+      - ./notification/src:/app/src
+      - notification-node-modules:/app/node_modules
+    expose:
+      - "4000"
+
+  mongodb:
+    image: mongo:8
+    volumes:
+      - mongodb-data-dev:/data/db
+
+volumes:
+  frontend-node-modules:
+  backend-node-modules:
+  notification-node-modules:
+  mongodb-data-dev:

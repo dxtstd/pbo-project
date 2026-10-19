@@ -1,0 +1,29 @@
+{
+  "name": "frontend",
+  "projectType": "application",
+  "sourceRoot": "website/frontend/src",
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm run dev",
+        "cwd": "website/frontend"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/website/frontend/dist"],
+      "options": {
+        "command": "npm run build",
+        "cwd": "website/frontend"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm run lint",
+        "cwd": "website/frontend"
+      }
+    }
+  }
+}

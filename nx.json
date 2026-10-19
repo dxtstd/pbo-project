@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "namedInputs": {
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "production": [
+      "default",
+      "!{projectRoot}/.eslintrc.json",
+      "!{projectRoot}/eslint.config.{js,cjs,mjs}",
+      "!{projectRoot}/**/?(*.){spec,test}.{js,ts,jsx,tsx}"
+    ],
+    "sharedGlobals": []
+  },
+  "targetDefaults": {
+    "build": {
+      "inputs": ["production", "^production"]
+    },
+    "lint": {
+      "inputs": ["default", "^default"]
+    }
+  }
+}

@@ -3,3 +3,11 @@ node_modules/
 .pnp.*
 *.lock
 dist
+
+.env
+.env.*
+!.env.example
+!.env.development.example
+!.env.production.example
+
+.nx/

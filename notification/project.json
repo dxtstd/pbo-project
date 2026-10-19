@@ -1,0 +1,14 @@
+{
+  "name": "notification",
+  "projectType": "application",
+  "sourceRoot": "notification/src",
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm run dev",
+        "cwd": "notification"
+      }
+    }
+  }
+}
