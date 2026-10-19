@@ -2,8 +2,8 @@
   "name": "pbo-kost-workspace",
   "private": true,
   "scripts": {
-    "dev": "nx run-many --target=dev --projects=frontend,backend,notification --parallel=3",
-    "dev:website": "nx run-many --target=dev --projects=frontend,backend --parallel=2",
+    "dev": "nx run-many --target=dev --projects=frontend,backend,notification --parallel=3 --output-style=stream",
+    "dev:website": "nx run-many --target=dev --projects=frontend,backend --parallel=2 --output-style=stream",
     "dev:notification": "nx run notification:dev",
     "build": "nx run frontend:build",
     "lint": "nx run frontend:lint"
