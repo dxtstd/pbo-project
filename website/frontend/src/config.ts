@@ -21,3 +21,8 @@ export const NOTIFICATION_URL = requiredUrl(
   "/notification",
   "VITE_NOTIFICATION_URL",
 );
+
+export const authHeaders = (): HeadersInit => {
+  const token = localStorage.getItem("authToken");
+  return token ? { authorization: `Bearer ${token}` } : {};
+};

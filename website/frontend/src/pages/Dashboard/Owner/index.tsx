@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
-import { API_URL } from "../../../config";
+import { useNavigate } from "react-router-dom";
+import { API_URL, authHeaders } from "../../../config";
 
 type Room = { roomId: string; name: string; customerId?: string; isOccupied: boolean };
 type OwnerData = { rooms: Room[]; customers: { customerId: string; firstname: string; lastname: string }[]; cashPayments?: { transactionId: string; totalAmount: number; invoiceNumber?: string }[] };
 
-const demo: OwnerData = { rooms: [{ roomId: "R01", name: "Kamar 01", customerId: "C01", isOccupied: true }, { roomId: "R02", name: "Kamar 02", customerId: "C02", isOccupied: true }, { roomId: "R03", name: "Kamar 03", isOccupied: false }], customers: [{ customerId: "C01", firstname: "Bambang", lastname: "" }, { customerId: "C02", firstname: "Mulyono", lastname: "" }] };
-
 export function OwnerDashboard() {
-  const [data, setData] = useState(demo);
+  const navigate = useNavigate();
+  const [data, setData] = useState<OwnerData>();
   const [message, setMessage] = useState("");
-  useEffect(() => { fetch(`${API_URL}/dashboard/owner/${localStorage.getItem("ownerId") || "demo-owner"}`).then((response) => response.ok ? response.json() : Promise.reject()).then(setData).catch(() => undefined); }, []);
+  useEffect(() => { const ownerId = localStorage.getItem("userId"); if (!ownerId) { navigate("/login"); return; } fetch(`${API_URL}/dashboard/owner/${ownerId}`, { headers: authHeaders() }).then((response) => response.ok ? response.json() : Promise.reject()).then(setData).catch(() => navigate("/login")); }, [navigate]);
+  if (!data) return <main className="min-h-screen bg-[#efe2d6] p-8">Memuat dashboard...</main>;
   const customerName = (id?: string) => data.customers.find((customer) => customer.customerId === id)?.firstname || "Kosong";
   const confirmCash = async (transactionId: string) => {
     const response = await fetch(`${API_URL}/payment/cash/${transactionId}/confirm`, { method: "POST" });

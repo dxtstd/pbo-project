@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { API_URL } from "../../../config";
+import { API_URL, authHeaders } from "../../../config";
 
 export function CustomerPayment() {
   const [invoice, setInvoice] = useState({ invoiceNumber: "INV-DEMO", amount: 470000, status: "unpaid" });
@@ -9,8 +9,9 @@ export function CustomerPayment() {
   const [paymentInfo, setPaymentInfo] = useState<{ actions?: { name: string; url: string }[]; vaNumbers?: { bank: string; va_number: string }[] }>({});
 
   useEffect(() => {
-    const customerId = localStorage.getItem("customerId") || "demo-customer";
-    fetch(`${API_URL}/dashboard/customer/${customerId}`).then((response) => response.ok ? response.json() : Promise.reject()).then((data: { invoices: typeof invoice[] }) => {
+    const customerId = localStorage.getItem("userId");
+    if (!customerId) return;
+    fetch(`${API_URL}/dashboard/customer/${customerId}`, { headers: authHeaders() }).then((response) => response.ok ? response.json() : Promise.reject()).then((data: { invoices: typeof invoice[] }) => {
       const unpaid = data.invoices.find((item) => item.status !== "paid");
       if (unpaid) setInvoice(unpaid);
     }).catch(() => undefined);
@@ -19,7 +20,7 @@ export function CustomerPayment() {
   const pay = async () => {
     const endpoint = method === "cash" ? "/payment/cash" : "/payment/charge";
     const body = method === "cash" ? { invoiceNumber: invoice.invoiceNumber } : { invoiceNumber: invoice.invoiceNumber, paymentType: method };
-    const response = await fetch(`${API_URL}${endpoint}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const response = await fetch(`${API_URL}${endpoint}`, { method: "POST", headers: { "content-type": "application/json", ...authHeaders() }, body: JSON.stringify(body) });
     const result = await response.json() as typeof paymentInfo & { redirectUrl?: string };
     if (response.ok && result.redirectUrl) window.location.assign(result.redirectUrl);
     else if (response.ok) {

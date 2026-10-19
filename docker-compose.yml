@@ -33,6 +33,7 @@ services:
       NOTIFICATION_WS_URL: ws://notification:4000
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?FRONTEND_ORIGIN must be set}
       MIDTRANS_ENVIRONMENT: ${MIDTRANS_ENVIRONMENT:-sandbox}
       MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:?MIDTRANS_SERVER_KEY must be set}
     depends_on:

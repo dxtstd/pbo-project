@@ -4,10 +4,13 @@ import Invoice from "../../../models/invoice";
 import Owner from "../../../models/owner";
 import Room from "../../../models/room";
 import Transaction from "../../../models/transaction";
+import { requireAuth, requireRole } from "../../../middlewares/auth";
 
 const dashboard = Router();
 
+dashboard.use(requireAuth);
 dashboard.get("/customer/:customerId", async (req, res) => {
+  if (req.user?.role !== "customer" || req.user.id !== req.params.customerId) return res.status(403).json({ message: "Cannot access this dashboard" });
   const customer = await Customer.findOne({ customerId: req.params.customerId }).lean();
   if (!customer) return res.status(404).json({ message: "Customer not found" });
   const invoices = await Invoice.find({ customerId: customer.customerId }).sort({ dueDate: 1 }).lean();
@@ -16,6 +19,7 @@ dashboard.get("/customer/:customerId", async (req, res) => {
 });
 
 dashboard.get("/owner/:ownerId", async (req, res) => {
+  if (req.user?.role !== "owner" || req.user.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot access this dashboard" });
   const owner = await Owner.findOne({ ownerId: req.params.ownerId }).lean();
   if (!owner) return res.status(404).json({ message: "Owner not found" });
   const rooms = await Room.find({ ownerId: owner.ownerId }).lean();

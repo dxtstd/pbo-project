@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { API_URL } from "../../../config";
+import { API_URL, authHeaders } from "../../../config";
 
 type Invoice = {
   invoiceNumber: string;
@@ -15,33 +15,29 @@ type CustomerDashboard = {
   invoices: Invoice[];
 };
 
-const demo: CustomerDashboard = {
-  customer: { firstname: "Bambang", lastname: "" },
-  room: { name: "Kamar 01", price: 450000 },
-  invoices: [{ invoiceNumber: "INV-DEMO", amount: 470000, dueDate: new Date().toISOString(), status: "unpaid" }],
-};
-
 const money = (value: number) => `Rp. ${value.toLocaleString("id-ID")}`;
 
 export function CustomerDashboard() {
   const navigate = useNavigate();
-  const [data, setData] = useState<CustomerDashboard>(demo);
+  const [data, setData] = useState<CustomerDashboard>();
   const [notice, setNotice] = useState("");
-  const customerId = localStorage.getItem("customerId") || "demo-customer";
+  const customerId = localStorage.getItem("userId");
 
   useEffect(() => {
-    fetch(`${API_URL}/dashboard/customer/${customerId}`)
+    if (!customerId) { navigate("/login"); return; }
+    fetch(`${API_URL}/dashboard/customer/${customerId}`, { headers: authHeaders() })
       .then((response) => response.ok ? response.json() as Promise<CustomerDashboard> : Promise.reject(new Error("demo")))
       .then(setData)
-      .catch(() => undefined);
-  }, [customerId]);
+      .catch(() => navigate("/login"));
+  }, [customerId, navigate]);
 
+  if (!data) return <main className="min-h-screen bg-[#efe2d6] p-8">Memuat dashboard...</main>;
   const invoice = data.invoices.find((item) => item.status !== "paid") || data.invoices[0];
   const submitCash = async () => {
     if (!invoice) return;
     const response = await fetch(`${API_URL}/payment/cash`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...authHeaders() },
       body: JSON.stringify({ invoiceNumber: invoice.invoiceNumber }),
     });
     setNotice(response.ok ? "Permintaan pembayaran tunai dikirim. Menunggu konfirmasi pemilik." : "Pembayaran tunai gagal dikirim.");
@@ -51,7 +47,7 @@ export function CustomerDashboard() {
     if (!invoice) return;
     const response = await fetch(`${API_URL}/payment/charge`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...authHeaders() },
       body: JSON.stringify({ invoiceNumber: invoice.invoiceNumber, paymentType }),
     });
     const result = await response.json() as { redirectUrl?: string };
@@ -64,7 +60,7 @@ export function CustomerDashboard() {
       <div className="mx-auto max-w-6xl">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div><p className="text-sm text-[#765e52]">Dashboard Penghuni</p><h1 className="font-serif text-3xl font-bold">Halo, {data.customer.firstname}</h1></div>
-          <button onClick={() => { localStorage.removeItem("customerId"); navigate("/"); }} className="rounded-lg border border-[#caa897] px-4 py-2 text-sm">Keluar</button>
+          <button onClick={() => { localStorage.clear(); navigate("/"); }} className="rounded-lg border border-[#caa897] px-4 py-2 text-sm">Keluar</button>
         </header>
         <section className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
           <div className="rounded-2xl border border-[#d1b4a4] bg-[#fffaf5] p-5 shadow-sm sm:p-7">
