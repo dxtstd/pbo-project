@@ -41,6 +41,7 @@ export function OwnerLayout() {
   const navigation = [
     { to: "/dashboard/owner", label: "Ringkasan", end: true },
     { to: "/dashboard/owner/kamar", label: "Daftar kamar" },
+    { to: "/dashboard/owner/customer", label: "Daftar customer" },
     { to: "/dashboard/owner/pembayaran", label: "Pembayaran" },
     { to: "/dashboard/owner/rekap", label: "Rekap bulanan" },
     { to: "/dashboard/owner/pengaturan", label: "Pengaturan" },

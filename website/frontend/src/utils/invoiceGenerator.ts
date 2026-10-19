@@ -46,3 +46,19 @@ h1{margin:0 0 8px;color:#694536} .muted{color:#765e52}
   link.click();
   URL.revokeObjectURL(url);
 };
+
+export const downloadInvoicePdf = async (url: string): Promise<void> => {
+  const response = await fetch(url, { headers: authHeaders() });
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({})) as { message?: string };
+    throw new Error(result.message || "Invoice PDF gagal diunduh");
+  }
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = response.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] || "invoice.pdf";
+  link.click();
+  URL.revokeObjectURL(objectUrl);
+};
+import { authHeaders } from "../config";

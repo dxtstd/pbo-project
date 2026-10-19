@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { API_URL, authHeaders } from "../../../config";
-import { downloadInvoice } from "../../../utils/invoiceGenerator";
+import { downloadInvoicePdf } from "../../../utils/invoiceGenerator";
 
 type Invoice = {
   invoiceNumber: string;
@@ -55,6 +55,14 @@ export function CustomerDashboard() {
     if (response.ok && result.redirectUrl) window.location.assign(result.redirectUrl);
     else setNotice("Pembayaran online belum dapat dibuat.");
   };
+  const downloadCustomerInvoice = async (invoiceNumber: string) => {
+    if (!customerId) return;
+    try {
+      await downloadInvoicePdf(`${API_URL}/dashboard/customer/${customerId}/invoices/${encodeURIComponent(invoiceNumber)}/pdf`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Invoice PDF gagal diunduh.");
+    }
+  };
   const sendTestNotification = async (scenario: "due_date" | "h7" | "payment_success") => {
     if (!customerId) return;
     const response = await fetch(`${API_URL}/dashboard/customer/${customerId}/notification/test`, {
@@ -82,7 +90,7 @@ export function CustomerDashboard() {
           </div>
           <div className="rounded-2xl border border-[#d1b4a4] bg-[#fffaf5] p-5 shadow-sm sm:p-7">
             <p className="mb-4 font-semibold">Riwayat tagihan</p>
-            <div className="space-y-3">{data.invoices.map((item) => <div key={item.invoiceNumber} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#e0c8bb] p-3 text-sm"><span><b>{item.invoiceNumber}</b><br /><span className="text-[#765e52]">{new Date(item.dueDate).toLocaleDateString("id-ID")}</span></span><div className="flex items-center gap-3"><span className={item.status === "paid" ? "text-green-700" : "text-orange-700"}>{item.status}</span><button type="button" onClick={() => downloadInvoice({ ...item, customerName: `${data.customer.firstname} ${data.customer.lastname}`, roomName: data.room?.name })} className="rounded-lg border border-[#caa897] px-3 py-1.5 text-xs font-semibold hover:bg-[#f4e6dc]">Unduh invoice</button></div></div>)}</div>
+            <div className="space-y-3">{data.invoices.map((item) => <div key={item.invoiceNumber} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#e0c8bb] p-3 text-sm"><span><b>{item.invoiceNumber}</b><br /><span className="text-[#765e52]">{new Date(item.dueDate).toLocaleDateString("id-ID")}</span></span><div className="flex items-center gap-3"><span className={item.status === "paid" ? "text-green-700" : "text-orange-700"}>{item.status}</span><button type="button" onClick={() => void downloadCustomerInvoice(item.invoiceNumber)} className="rounded-lg border border-[#caa897] px-3 py-1.5 text-xs font-semibold hover:bg-[#f4e6dc]">Unduh PDF</button></div></div>)}</div>
           </div>
         </section>
         {notice && <p className="mt-4 rounded-lg bg-[#ead0c2] p-3 text-sm">{notice}</p>}

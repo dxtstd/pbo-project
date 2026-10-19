@@ -3,6 +3,7 @@ import Customer from "../../../../models/customer";
 import Invoice from "../../../../models/invoice";
 import Room from "../../../../models/room";
 import { config } from "../../../../config/env";
+import { generateInvoicePdf } from "../../../../services/invoicePdf";
 
 const customerDashboard = Router();
 
@@ -17,6 +18,38 @@ customerDashboard.get("/:customerId", async (req, res) => {
   const invoices = await Invoice.find({ customerId: customer.customerId }).sort({ dueDate: 1 }).lean();
   const room = await Room.findOne({ customerId: customer.customerId }).lean();
   return res.json({ customer, room, invoices });
+});
+
+customerDashboard.get("/:customerId/invoices/:invoiceNumber/pdf", async (req, res) => {
+  if (req.user?.role !== "customer" || req.user.id !== req.params.customerId) {
+    return res.status(403).json({ message: "Cannot download this invoice" });
+  }
+  const invoice = await Invoice.findOne({
+    invoiceNumber: req.params.invoiceNumber,
+    customerId: req.params.customerId,
+  }).lean();
+  if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+  const [customer, room] = await Promise.all([
+    Customer.findOne({ customerId: req.params.customerId }).lean(),
+    Room.findOne({ roomId: invoice.roomId, customerId: req.params.customerId }).lean(),
+  ]);
+  if (!customer || !room) return res.status(404).json({ message: "Invoice details not found" });
+  try {
+    const pdf = await generateInvoicePdf({
+      invoiceNumber: invoice.invoiceNumber,
+      amount: invoice.amount,
+      dueDate: invoice.dueDate,
+      status: invoice.status,
+      customerName: `${customer.firstname} ${customer.lastname}`.trim(),
+      roomName: room.name,
+    });
+    res.setHeader("content-type", "application/pdf");
+    res.setHeader("content-disposition", `attachment; filename="${invoice.invoiceNumber}.pdf"`);
+    return res.send(Buffer.from(pdf));
+  } catch (error) {
+    console.error("Failed to generate customer invoice PDF", error);
+    return res.status(500).json({ message: "Invoice PDF could not be generated" });
+  }
 });
 
 customerDashboard.post("/:customerId/notification/test", async (req, res) => {

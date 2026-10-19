@@ -10,6 +10,7 @@ import { OwnerRooms } from './pages/Dashboard/Owner/Rooms';
 import { OwnerPayments } from './pages/Dashboard/Owner/Payments';
 import { OwnerReports } from './pages/Dashboard/Owner/Reports';
 import { OwnerSettings } from './pages/Dashboard/Owner/Settings';
+import { OwnerCustomers } from './pages/Dashboard/Owner/Customers';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 
@@ -41,6 +42,7 @@ function AppRoutes() {
           <Route path="/dashboard/owner" element={<OwnerDashboard />}>
             <Route index element={<OwnerSummary />}></Route>
             <Route path="kamar" element={<OwnerRooms />}></Route>
+            <Route path="customer" element={<OwnerCustomers />}></Route>
             <Route path="pembayaran" element={<OwnerPayments />}></Route>
             <Route path="rekap" element={<OwnerReports />}></Route>
             <Route path="pengaturan" element={<OwnerSettings />}></Route>

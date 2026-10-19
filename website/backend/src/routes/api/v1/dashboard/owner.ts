@@ -6,6 +6,7 @@ import Room from "../../../../models/room";
 import Transaction from "../../../../models/transaction";
 import { config } from "../../../../config/env";
 import { requireRole } from "../../../../middlewares/auth";
+import { generateInvoicePdf } from "../../../../services/invoicePdf";
 
 const ownerDashboard = Router();
 const furnitureFee = 100000;
@@ -31,9 +32,7 @@ ownerDashboard.use(requireRole("owner"));
  */
 ownerDashboard.get("/:ownerId/customers", async (req, res) => {
   if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot access these customers" });
-  const rooms = await Room.find({ ownerId: req.params.ownerId }).select("customerId").lean();
-  const customerIds = rooms.flatMap((room) => room.customerId ? [room.customerId] : []);
-  const customers = await Customer.find({ customerId: { $in: customerIds } }).select("-password").lean();
+  const customers = await Customer.find({ ownerId: req.params.ownerId }).select("-password").sort({ firstname: 1, lastname: 1 }).lean();
   return res.json({ customers });
 });
 
@@ -45,8 +44,8 @@ ownerDashboard.get("/:ownerId/customers", async (req, res) => {
  * @returns True when an owner room references the customer.
  */
 const customerBelongsToOwner = async (ownerId: string, customerId: string): Promise<boolean> => {
-  const room = await Room.exists({ ownerId, customerId });
-  return Boolean(room);
+  const customer = await Customer.exists({ ownerId, customerId });
+  return Boolean(customer);
 };
 
 /**
@@ -79,7 +78,7 @@ ownerDashboard.post("/:ownerId/customers", async (req, res) => {
   }
   const bcrypt = await import("bcrypt");
   const customer = await Customer.create({
-    customerId, username, firstname, lastname, phoneNumber,
+    customerId, ownerId: req.params.ownerId, username, firstname, lastname, phoneNumber,
     password: await bcrypt.hash(String(password), 12),
   });
   const { password: _password, ...safeCustomer } = customer.toObject();
@@ -122,8 +121,9 @@ ownerDashboard.patch("/:ownerId/customers/:customerId", async (req, res) => {
     updates.password = await bcrypt.hash(String(updates.password), 12);
   }
   delete updates.customerId;
+  delete updates.ownerId;
   const customer = await Customer.findOneAndUpdate(
-    { customerId: req.params.customerId },
+    { customerId: req.params.customerId, ownerId: req.params.ownerId },
     updates,
     { new: true, runValidators: true },
   ).select("-password").lean();
@@ -157,7 +157,7 @@ ownerDashboard.delete("/:ownerId/customers/:customerId", async (req, res) => {
   if (!await customerBelongsToOwner(req.params.ownerId, req.params.customerId)) {
     return res.status(404).json({ message: "Customer not found for this owner" });
   }
-  const deleted = await Customer.deleteOne({ customerId: req.params.customerId });
+  const deleted = await Customer.deleteOne({ customerId: req.params.customerId, ownerId: req.params.ownerId });
   if (!deleted.deletedCount) return res.status(404).json({ message: "Customer not found" });
   return res.status(204).send();
 });
@@ -287,6 +287,33 @@ ownerDashboard.get("/:ownerId", async (req, res) => {
   return res.json({ owner, rooms, customers, invoices, cashPayments, transactions });
 });
 
+ownerDashboard.get("/:ownerId/invoices/:invoiceNumber/pdf", async (req, res) => {
+  if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot download this invoice" });
+  const invoice = await Invoice.findOne({ invoiceNumber: req.params.invoiceNumber }).lean();
+  if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+  const [room, customer] = await Promise.all([
+    Room.findOne({ roomId: invoice.roomId, ownerId: req.params.ownerId }).lean(),
+    Customer.findOne({ customerId: invoice.customerId }).lean(),
+  ]);
+  if (!room || !customer) return res.status(404).json({ message: "Invoice does not belong to this owner" });
+  try {
+    const pdf = await generateInvoicePdf({
+      invoiceNumber: invoice.invoiceNumber,
+      amount: invoice.amount,
+      dueDate: invoice.dueDate,
+      status: invoice.status,
+      customerName: `${customer.firstname} ${customer.lastname}`.trim(),
+      roomName: room.name,
+    });
+    res.setHeader("content-type", "application/pdf");
+    res.setHeader("content-disposition", `attachment; filename="${invoice.invoiceNumber}.pdf"`);
+    return res.send(Buffer.from(pdf));
+  } catch (error) {
+    console.error("Failed to generate owner invoice PDF", error);
+    return res.status(500).json({ message: "Invoice PDF could not be generated" });
+  }
+});
+
 /**
  * @openapi
  * /api/v1/dashboard/owner/{ownerId}/rooms:
@@ -357,6 +384,35 @@ ownerDashboard.patch("/:ownerId/rooms/:roomId", async (req, res) => {
   ).lean();
   if (!room) return res.status(404).json({ message: "Kamar tidak ditemukan" });
   return res.json(room);
+});
+
+ownerDashboard.patch("/:ownerId/rooms/:roomId/customer", async (req, res) => {
+  if (req.user?.id !== req.params.ownerId) {
+    return res.status(403).json({ message: "Cannot assign this room" });
+  }
+  const { customerId } = req.body as { customerId?: string | null };
+  const room = await Room.findOne({ roomId: req.params.roomId, ownerId: req.params.ownerId }).lean();
+  if (!room) return res.status(404).json({ message: "Kamar tidak ditemukan" });
+
+  if (customerId) {
+    const customer = await Customer.findOne({ customerId }).select("customerId").lean();
+    if (!customer) return res.status(404).json({ message: "Customer tidak ditemukan" });
+    const occupiedByAnotherRoom = await Room.findOne({
+      ownerId: req.params.ownerId,
+      customerId,
+      roomId: { $ne: req.params.roomId },
+    }).select("roomId").lean();
+    if (occupiedByAnotherRoom) {
+      return res.status(409).json({ message: "Customer sudah menempati kamar lain" });
+    }
+  }
+
+  const updated = await Room.findOneAndUpdate(
+    { roomId: req.params.roomId, ownerId: req.params.ownerId },
+    { $set: { customerId: customerId || undefined, isOccupied: Boolean(customerId) } },
+    { new: true, runValidators: true },
+  ).lean();
+  return res.json(updated);
 });
 
 export default ownerDashboard;
