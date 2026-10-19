@@ -10,17 +10,17 @@ import React from "react";
 //     { id: 1, title: "Faselitas", img: "/img/facilites.png" },
 // ];
 
-export const Facilities = function (): React.ReactElement {
+export const Facilities = function ({ title, description }: { title?: string; description?: string }): React.ReactElement {
   return (
     <section id="facilities" className="flex min-h-[calc(100dvh-76px)] scroll-mt-[76px] items-center px-4 py-12 sm:px-8 md:min-h-[calc(100dvh-88px)] md:scroll-mt-[88px] md:px-12 lg:px-16 xl:px-20">
       <div className="mx-auto w-full max-w-7xl lg:max-w-[1120px] xl:max-w-[1300px] 2xl:max-w-[1500px]">
         {/* Header */}
         <div className="mb-8 max-w-2xl">
           <h1 className="mb-2 font-serif text-2xl font-bold text-[#4A3B32] sm:text-3xl">
-          Fasilitas Kost Camp M2
+          {title || "Fasilitas Kost Camp M2"}
           </h1>
           <p className="text-sm text-[#6C5A52]">
-            Nikmati kenyamanan tinggal di Kost Camp M2 dengan fasilitas lengkap yang dirancang untuk mendukung aktivitas harian, kenyamanan, dan ketenangan Anda.
+            {description || "Nikmati kenyamanan tinggal di Kost Camp M2 dengan fasilitas lengkap yang dirancang untuk mendukung aktivitas harian, kenyamanan, dan ketenangan Anda."}
           </p>
         </div>
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { ContactformData } from '../types';
 
-export const Contact = function (): React.ReactElement {
+export const Contact = function ({ title, description, location, whatsapp }: { title?: string; description?: string; location?: string; whatsapp?: string }): React.ReactElement {
   const [formData, setFormData] = useState<ContactformData>({
     name: '',
     whatsapp: '',
@@ -19,10 +19,10 @@ export const Contact = function (): React.ReactElement {
       <div className="w-full max-w-5xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
         <div className="text-center">
           <h2 className="mb-2 font-serif text-2xl font-bold  text-[#4A3B32] sm:text-3xl">
-          Contact Us
+          {title || "Contact Us"}
           </h2>
           <p className="mb-8 text-sm text-[#6C5A52]">
-            Hubungi kami untuk informasi lebih lanjut mengenai Kost Camp M2.
+            {description || "Hubungi kami untuk informasi lebih lanjut mengenai Kost Camp M2."}
           </p>
         </div>
         <div className="grid gap-5 md:grid-cols-2">
@@ -31,11 +31,11 @@ export const Contact = function (): React.ReactElement {
             <div className="space-y-5 text-sm text-[#6C5A52]">
               <div>
                 <p className="font-semibold text-[#4A3B32]">Lokasi</p>
-                <p className="mt-1">Tataaran Satu, Kec. Tondano Sel., Kabupaten Minahasa, Sulawesi Utara, Indonesia</p>
+                <p className="mt-1">{location || "Tataaran Satu, Kec. Tondano Sel., Kabupaten Minahasa, Sulawesi Utara, Indonesia"}</p>
               </div>
               <div>
                 <p className="font-semibold text-[#4A3B32]">WhatsApp</p>
-                <p className="mt-1">+62 813-9991-2220</p>
+                <p className="mt-1">{whatsapp || "+62 813-9991-2220"}</p>
               </div>
             </div>
           </div>

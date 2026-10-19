@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { LoginFormData } from '../types';
 import { API_URL } from '../config';
 import { useAuthStore } from '../stores/auth';
+import { Toast } from '../components/Toast';
 
 export const Login: React.FC = () => {
   const [formData, setFormData] = useState<LoginFormData>({ username: '', password: '' });
@@ -26,7 +27,7 @@ export const Login: React.FC = () => {
         return;
       }
       login(result.token, { ...result.user, username: formData.username });
-      navigate(result.user.role === 'owner' ? '/dashboard/owner' : result.user.role === 'customer' ? '/dashboard/customer' : '/');
+      navigate(result.user.role === 'owner' ? '/dashboard/owner' : result.user.role === 'customer' ? '/dashboard/customer' : '/admin');
     } catch {
       setError('Tidak dapat terhubung ke server. Pastikan backend sedang berjalan.');
     } finally {
@@ -65,7 +66,7 @@ export const Login: React.FC = () => {
           >
             {isSubmitting ? 'Memeriksa...' : 'Login'}
           </button>
-          {error && <p className="text-sm text-red-700">{error}</p>}
+          {error && <Toast message={error} onClose={() => setError('')} />}
         </form>
       </div>
       

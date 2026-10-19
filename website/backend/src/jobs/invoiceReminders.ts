@@ -45,7 +45,7 @@ export const sendInvoiceReminders = async (): Promise<void> => {
         customerName: `${customer.firstname} ${customer.lastname}`,
         customerPhone: customer.phoneNumber,
         ownerName: `${owner.firstname} ${owner.lastname}`,
-        ownerPhone: owner.phoneNumber,
+        ownerPhone: owner.notificationPhone || owner.phoneNumber,
         amount: invoice.amount,
         dueDate: invoice.dueDate.toISOString().slice(0, 10),
         daysBeforeDue,

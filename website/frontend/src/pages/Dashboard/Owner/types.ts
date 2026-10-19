@@ -1,10 +1,13 @@
 export type Room = {
   roomId: string;
+  ownerId?: string;
   name: string;
   type: string;
   price: number;
   withFurniture: boolean;
   customerId?: string;
+  rentalStartDate?: string;
+  monthlyDueDay?: number;
   isOccupied: boolean;
 };
 

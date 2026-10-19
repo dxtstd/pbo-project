@@ -1,8 +1,15 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Facilities } from './Facilities';
 import { Contact } from './Contact';
 
 export const Home = function (): React.ReactElement {
+  const [content, setContent] = useState<{ siteName: string; heroTitle: string; heroDescription: string; facilitiesTitle: string; facilitiesDescription: string; contactTitle: string; contactDescription: string; location: string; whatsapp: string }>();
+  useEffect(() => {
+    fetch("/api/v1/site-content")
+      .then((response) => response.ok ? response.json() as Promise<{ content?: typeof content }> : Promise.reject())
+      .then((result) => { if (result.content) setContent(result.content); })
+      .catch(() => undefined);
+  }, []);
   return (
     <div>
       <section id="home" className="flex min-h-[calc(100dvh-76px)] scroll-mt-[76px] items-center px-4 py-8 sm:px-8 md:min-h-[calc(100dvh-88px)] md:scroll-mt-[88px] md:px-12 lg:px-16 xl:px-20">
@@ -11,9 +18,9 @@ export const Home = function (): React.ReactElement {
             <img src="/img/kost.png" alt="Kost Camp M2" className="aspect-[16/10] w-full rounded-lg object-contain" />
           </div>
           <div className="w-full max-w-xl space-y-5 text-center md:text-left lg:max-w-xl lg:space-y-5 xl:max-w-2xl xl:space-y-7 2xl:max-w-3xl">
-            <h1 className="font-serif text-3xl  font-bold text-[#4A3B32] sm:text-4xl lg:text-4xl xl:text-5xl 2xl:text-6xl">Kost Camp M2</h1>
+            <h1 className="font-serif text-3xl  font-bold text-[#4A3B32] sm:text-4xl lg:text-4xl xl:text-5xl 2xl:text-6xl">{content?.heroTitle || "Kost Camp M2"}</h1>
             <p className="text-sm leading-relaxed text-[#6B5B52] lg:text-base xl:text-lg">
-              Tinggal dan suasana yang nyaman di Kost Camp M2. Lokasi strategis dengan fasilitas lengkap yang dirancang untuk memberikan kenyamanan dan ketenangan Anda.
+              {content?.heroDescription || "Tinggal dan suasana yang nyaman di Kost Camp M2. Lokasi strategis dengan fasilitas lengkap yang dirancang untuk memberikan kenyamanan dan ketenangan Anda."}
             </p>
             <button
               onClick={() => { window.location.href = "/login" }}
@@ -24,8 +31,8 @@ export const Home = function (): React.ReactElement {
           </div>
         </div>
       </section>
-      <Facilities />
-      <Contact />
+      <Facilities title={content?.facilitiesTitle} description={content?.facilitiesDescription} />
+      <Contact title={content?.contactTitle} description={content?.contactDescription} location={content?.location} whatsapp={content?.whatsapp} />
     </div>
   );
 };

@@ -7,6 +7,7 @@
     lastname: string;
     email: string;
     phoneNumber: string;
+    notificationPhone?: string;
     password: string;
   }
 
@@ -17,6 +18,7 @@
     lastname: { type: String, required: true },
     email: { type: String, required: true, unique: true, index: true },
     phoneNumber: { type: String, required: true },
+    notificationPhone: { type: String, required: false },
     password: { type: String, required: true },
   }, {
     timestamps: true,

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import Owner from "../../../../models/owner";
+import SiteContent from "../../../../models/siteContent";
 import { requireAuth, isAdmin } from "../../../../middlewares/auth";
 
 const admin = Router();
@@ -9,6 +10,23 @@ admin.use(
   requireAuth,
   isAdmin,
 );
+
+admin.get("/site-content", async (_req, res) => {
+  const content = await SiteContent.findOne({ key: "landing" }).lean();
+  return res.json({ content });
+});
+
+admin.put("/site-content", async (req, res) => {
+  const fields = ["siteName", "heroTitle", "heroDescription", "facilitiesTitle", "facilitiesDescription", "contactTitle", "contactDescription", "location", "whatsapp"] as const;
+  const updates = Object.fromEntries(fields.map((field) => [field, String(req.body[field] || "").trim()]));
+  if (Object.values(updates).some((value) => !value)) return res.status(400).json({ message: "Semua konten landing page wajib diisi" });
+  const content = await SiteContent.findOneAndUpdate(
+    { key: "landing" },
+    { $set: { ...updates, key: "landing" } },
+    { new: true, upsert: true, runValidators: true },
+  ).lean();
+  return res.json({ content });
+});
 
 /**
  * @openapi

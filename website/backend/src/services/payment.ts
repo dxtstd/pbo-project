@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import Customer from "../models/customer";
 import Invoice from "../models/invoice";
 import Transaction from "../models/transaction";
+import Room from "../models/room";
 import {
   isSuccessfulMidtransStatus,
   type MidtransCharge,
@@ -13,8 +14,8 @@ import {
 export class PaymentService {
   public constructor(private readonly gateway: PaymentGateway = new MidtransGateway()) {}
 
-  public async requestCash(invoiceNumber: string) {
-    const invoice = await this.findUnpaidInvoice(invoiceNumber);
+  public async requestCash(invoiceNumber: string, customerId: string) {
+    const invoice = await this.findUnpaidInvoice(invoiceNumber, customerId);
     const transaction = await Transaction.create({
       transactionId: `CASH-${crypto.randomUUID()}`,
       invoiceNumber: invoice.invoiceNumber,
@@ -28,11 +29,11 @@ export class PaymentService {
     return { transactionId: transaction.transactionId, status: transaction.status };
   }
 
-  public async createOnlinePayment(invoiceNumber: string, paymentType: MidtransPaymentType) {
+  public async createOnlinePayment(invoiceNumber: string, paymentType: MidtransPaymentType, customerId: string) {
     if (!["qris", "bank_transfer"].includes(paymentType)) {
       throw new Error("Unsupported payment type");
     }
-    const invoice = await this.findUnpaidInvoice(invoiceNumber);
+    const invoice = await this.findUnpaidInvoice(invoiceNumber, customerId);
     const customer = await Customer.findOne({ customerId: invoice.customerId }).lean();
     if (!customer) throw new Error("Customer not found");
     const orderId = `INV-${invoice.invoiceNumber}-${Date.now()}`;
@@ -69,7 +70,11 @@ export class PaymentService {
     }
   }
 
-  public async confirmCash(transactionId: string) {
+  public async confirmCash(transactionId: string, ownerId: string) {
+    const candidate = await Transaction.findOne({ transactionId, status: "cash_pending" }).lean();
+    if (!candidate) throw new Error("Cash payment not found or already confirmed");
+    const room = await Room.findOne({ roomId: candidate.roomId, ownerId }).select("roomId").lean();
+    if (!room) throw new Error("Cash payment does not belong to this owner");
     const transaction = await Transaction.findOneAndUpdate(
       { transactionId, status: "cash_pending" },
       { status: "confirmed" },
@@ -80,8 +85,8 @@ export class PaymentService {
     return { transactionId: transaction.transactionId, status: transaction.status };
   }
 
-  private async findUnpaidInvoice(invoiceNumber: string) {
-    const invoice = await Invoice.findOne({ invoiceNumber, status: { $ne: "paid" } });
+  private async findUnpaidInvoice(invoiceNumber: string, customerId: string) {
+    const invoice = await Invoice.findOne({ invoiceNumber, customerId, status: { $ne: "paid" } });
     if (!invoice) throw new Error("Unpaid invoice not found");
     return invoice;
   }

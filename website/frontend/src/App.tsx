@@ -12,6 +12,7 @@ import { OwnerReports } from './pages/Dashboard/Owner/Reports';
 import { OwnerSettings } from './pages/Dashboard/Owner/Settings';
 import { OwnerCustomers } from './pages/Dashboard/Owner/Customers';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AdminDashboard } from './pages/Admin';
 
 
 export default function App() {
@@ -34,6 +35,9 @@ function AppRoutes() {
         <Routes>
           <Route path="/" element={<Home></Home>}></Route>
           <Route path="/login" element={<Login></Login>}></Route>
+          <Route element={<ProtectedRoute roles={['admin']} />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+          </Route>
           <Route element={<ProtectedRoute roles={['customer']} />}>
             <Route path="/dashboard/customer" element={<CustomerDashboard />}></Route>
             <Route path="/dashboard/customer/payment" element={<CustomerPayment />}></Route>

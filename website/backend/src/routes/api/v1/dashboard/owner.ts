@@ -14,6 +14,11 @@ const roomSizes = ["small", "medium", "large"];
 
 ownerDashboard.use(requireRole("owner"));
 
+const getClampedDueDate = (year: number, month: number, dueDay: number): Date => {
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return new Date(year, month, Math.min(dueDay, lastDay));
+};
+
 /**
  * @openapi
  * /api/v1/dashboard/owner/{ownerId}/customers:
@@ -31,8 +36,7 @@ ownerDashboard.use(requireRole("owner"));
  *       403: { description: Owner access denied }
  */
 ownerDashboard.get("/:ownerId/customers", async (req, res) => {
-  if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot access these customers" });
-  const customers = await Customer.find({ ownerId: req.params.ownerId }).select("-password").sort({ firstname: 1, lastname: 1 }).lean();
+  const customers = await Customer.find().select("-password").sort({ firstname: 1, lastname: 1 }).lean();
   return res.json({ customers });
 });
 
@@ -176,10 +180,12 @@ ownerDashboard.delete("/:ownerId/customers/:customerId", async (req, res) => {
  */
 ownerDashboard.get("/:ownerId/notification", async (req, res) => {
   if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot access this notification setup" });
+  const owner = await Owner.findOne({ ownerId: req.params.ownerId }).select("phoneNumber notificationPhone").lean();
+  if (!owner) return res.status(404).json({ message: "Owner not found" });
   try {
     const response = await fetch(`${config.notificationHttpUrl}/status`);
     if (!response.ok) return res.status(502).json({ message: "Notification service unavailable" });
-    return res.json(await response.json());
+    return res.json({ ...(await response.json()), ownerPhone: owner.phoneNumber, notificationPhone: owner.notificationPhone || owner.phoneNumber });
   } catch {
     return res.status(503).json({ message: "Notification service unavailable" });
   }
@@ -199,13 +205,32 @@ ownerDashboard.get("/:ownerId/notification", async (req, res) => {
  */
 ownerDashboard.post("/:ownerId/notification/pair", async (req, res) => {
   if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot pair this notification setup" });
+  const owner = await Owner.findOne({ ownerId: req.params.ownerId }).select("phoneNumber notificationPhone").lean();
+  if (!owner) return res.status(404).json({ message: "Owner not found" });
   try {
-    const response = await fetch(`${config.notificationHttpUrl}/pair`, { method: "POST" });
+    const response = await fetch(`${config.notificationHttpUrl}/pair`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ phone: owner.notificationPhone || owner.phoneNumber }),
+    });
     if (!response.ok) return res.status(502).json({ message: "Notification pairing could not be started" });
     return res.json(await response.json());
   } catch {
     return res.status(503).json({ message: "Notification service unavailable" });
   }
+});
+
+ownerDashboard.put("/:ownerId/notification/phone", async (req, res) => {
+  if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot update this notification setup" });
+  const phone = String(req.body.phone || "").replace(/\D/g, "");
+  if (phone.length < 10 || phone.length > 15) return res.status(400).json({ message: "Nomor WhatsApp tidak valid" });
+  const owner = await Owner.findOneAndUpdate(
+    { ownerId: req.params.ownerId },
+    { notificationPhone: phone },
+    { new: true, runValidators: true },
+  ).select("phoneNumber notificationPhone").lean();
+  if (!owner) return res.status(404).json({ message: "Owner not found" });
+  return res.json({ notificationPhone: owner.notificationPhone });
 });
 
 /**
@@ -272,14 +297,12 @@ ownerDashboard.post("/:ownerId/notification/test", async (req, res) => {
  *       404: { description: Owner not found }
  */
 ownerDashboard.get("/:ownerId", async (req, res) => {
-  if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot access this dashboard" });
-  const owner = await Owner.findOne({ ownerId: req.params.ownerId }).lean();
+  const owner = await Owner.findOne({ ownerId: req.user?.id }).lean();
   if (!owner) return res.status(404).json({ message: "Owner not found" });
 
-  const rooms = await Room.find({ ownerId: owner.ownerId }).lean();
+  const rooms = await Room.find().lean();
   const roomIds = rooms.map((room) => room.roomId);
-  const customerIds = rooms.flatMap((room) => room.customerId ? [room.customerId] : []);
-  const customers = await Customer.find({ customerId: { $in: customerIds } }).select("-password").lean();
+  const customers = await Customer.find().select("-password").sort({ firstname: 1, lastname: 1 }).lean();
   const invoices = await Invoice.find({ roomId: { $in: roomIds } }).sort({ dueDate: 1 }).lean();
   const cashPayments = await Transaction.find({ roomId: { $in: roomIds }, status: "cash_pending" }).lean();
   const transactions = await Transaction.find({ roomId: { $in: roomIds } }).sort({ paymentDate: -1 }).limit(100).lean();
@@ -288,11 +311,10 @@ ownerDashboard.get("/:ownerId", async (req, res) => {
 });
 
 ownerDashboard.get("/:ownerId/invoices/:invoiceNumber/pdf", async (req, res) => {
-  if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot download this invoice" });
   const invoice = await Invoice.findOne({ invoiceNumber: req.params.invoiceNumber }).lean();
   if (!invoice) return res.status(404).json({ message: "Invoice not found" });
   const [room, customer] = await Promise.all([
-    Room.findOne({ roomId: invoice.roomId, ownerId: req.params.ownerId }).lean(),
+    Room.findOne({ roomId: invoice.roomId }).lean(),
     Customer.findOne({ customerId: invoice.customerId }).lean(),
   ]);
   if (!room || !customer) return res.status(404).json({ message: "Invoice does not belong to this owner" });
@@ -386,16 +408,60 @@ ownerDashboard.patch("/:ownerId/rooms/:roomId", async (req, res) => {
   return res.json(room);
 });
 
+/**
+ * @openapi
+ * /api/v1/dashboard/owner/{ownerId}/rooms/{roomId}:
+ *   delete:
+ *     summary: Delete an owner's vacant room
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       204: { description: Room deleted }
+ *       400: { description: Occupied room cannot be deleted }
+ *       401: { description: Authentication required }
+ *       403: { description: Owner access denied }
+ *       404: { description: Room not found }
+ */
+ownerDashboard.delete("/:ownerId/rooms/:roomId", async (req, res) => {
+  if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot modify this dashboard" });
+
+  const room = await Room.findOne({ roomId: req.params.roomId }).select("ownerId isOccupied").lean();
+  if (!room) return res.status(404).json({ message: "Kamar tidak ditemukan" });
+  if (room.ownerId !== req.params.ownerId) return res.status(403).json({ message: "Kamar ini dimiliki owner lain" });
+  if (room.isOccupied) return res.status(400).json({ message: "Kamar yang masih memiliki penghuni tidak dapat dihapus" });
+
+  await Room.deleteOne({ roomId: req.params.roomId, ownerId: req.params.ownerId });
+  return res.status(204).send();
+});
+
 ownerDashboard.patch("/:ownerId/rooms/:roomId/customer", async (req, res) => {
   if (req.user?.id !== req.params.ownerId) {
     return res.status(403).json({ message: "Cannot assign this room" });
   }
-  const { customerId } = req.body as { customerId?: string | null };
+  const { customerId, rentalStartDate, monthlyDueDay } = req.body as {
+    customerId?: string | null;
+    rentalStartDate?: string;
+    monthlyDueDay?: number;
+  };
   const room = await Room.findOne({ roomId: req.params.roomId, ownerId: req.params.ownerId }).lean();
   if (!room) return res.status(404).json({ message: "Kamar tidak ditemukan" });
 
+  if (!customerId) {
+    const updated = await Room.findOneAndUpdate(
+      { roomId: req.params.roomId, ownerId: req.params.ownerId },
+      { $unset: { customerId: 1, rentalStartDate: 1, monthlyDueDay: 1 }, $set: { isOccupied: false } },
+      { new: true, runValidators: true },
+    ).lean();
+    return res.json(updated);
+  }
+
+  if (!rentalStartDate || typeof monthlyDueDay !== "number" || !Number.isInteger(monthlyDueDay) || monthlyDueDay < 1 || monthlyDueDay > 31) {
+    return res.status(400).json({ message: "Tanggal mulai sewa dan tanggal jatuh tempo 1–31 wajib diisi" });
+  }
+  const startDate = new Date(rentalStartDate);
+  if (Number.isNaN(startDate.getTime())) return res.status(400).json({ message: "Tanggal mulai sewa tidak valid" });
+  const dueDay = monthlyDueDay;
   if (customerId) {
-    const customer = await Customer.findOne({ customerId }).select("customerId").lean();
+    const customer = await Customer.findOne({ customerId, ownerId: req.params.ownerId }).select("customerId").lean();
     if (!customer) return res.status(404).json({ message: "Customer tidak ditemukan" });
     const occupiedByAnotherRoom = await Room.findOne({
       ownerId: req.params.ownerId,
@@ -407,12 +473,25 @@ ownerDashboard.patch("/:ownerId/rooms/:roomId/customer", async (req, res) => {
     }
   }
 
+  const dueDate = getClampedDueDate(startDate.getFullYear(), startDate.getMonth(), dueDay);
+  const existingInvoice = await Invoice.findOne({ roomId: room.roomId, customerId }).sort({ createdAt: -1 }).lean();
+  const invoice = existingInvoice || await Invoice.create({
+    invoiceNumber: `INV-${Date.now().toString(36).toUpperCase()}`,
+    customerId,
+    roomId: room.roomId,
+    basePrice: room.price,
+    additionalFees: 0,
+    totalAmount: room.price,
+    amount: room.price,
+    dueDate,
+    status: "unpaid",
+  });
   const updated = await Room.findOneAndUpdate(
     { roomId: req.params.roomId, ownerId: req.params.ownerId },
-    { $set: { customerId: customerId || undefined, isOccupied: Boolean(customerId) } },
+    { $set: { customerId, rentalStartDate: startDate, monthlyDueDay: dueDay, isOccupied: true } },
     { new: true, runValidators: true },
   ).lean();
-  return res.json(updated);
+  return res.json({ room: updated, invoice });
 });
 
 export default ownerDashboard;

@@ -4,6 +4,8 @@ export interface IRoom extends Document {
   roomId: string;
   ownerId?: string;
   customerId: string;
+  rentalStartDate?: Date;
+  monthlyDueDay?: number;
   name: string;
   type: string;
   price: number;
@@ -15,6 +17,8 @@ const RoomSchema: Schema = new Schema({
   roomId: { type: String, required: true, unique: true },
   ownerId: { type: String, required: false, default: undefined, index: true },
   customerId: { type: String, required: false, default: undefined, index: true },
+  rentalStartDate: { type: Date, required: false },
+  monthlyDueDay: { type: Number, required: false, min: 1, max: 31 },
   name: { type: String, required: true },
   type: { type: String, required: true },
   price: { type: Number, required: true },

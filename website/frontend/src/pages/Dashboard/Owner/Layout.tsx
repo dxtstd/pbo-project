@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { loadOwnerDashboard } from "./api";
 import type { OwnerData } from "./types";
+import { Toast } from "../../../components/Toast";
 
 export function OwnerLayout() {
   const navigate = useNavigate();
@@ -65,7 +66,7 @@ export function OwnerLayout() {
           </header>
           <div className="mb-6 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 lg:hidden">{navigation.map((item) => <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `whitespace-nowrap rounded-full px-4 py-2 text-sm ${isActive ? "bg-[#694536] text-white" : "bg-[#f8eee7] text-[#765e52]"}`}>{item.label}</NavLink>)}</div>
           <Outlet context={{ data, refresh, setMessage }} />
-          {message && <p className="mt-5 rounded-lg bg-[#ead0c2] p-3 text-sm">{message}</p>}
+          {message && <Toast message={message} onClose={() => setMessage("")} />}
         </div>
       </div>
     </main>

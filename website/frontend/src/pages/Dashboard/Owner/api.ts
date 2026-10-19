@@ -31,11 +31,22 @@ export const updateRoom = async (ownerId: string, roomId: string, payload: { nam
   }
 };
 
-export const assignRoomCustomer = async (ownerId: string, roomId: string, customerId: string | null) => {
+export const deleteRoom = async (ownerId: string, roomId: string) => {
+  const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/rooms/${roomId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({})) as { message?: string };
+    throw new Error(result.message || "Kamar gagal dihapus");
+  }
+};
+
+export const assignRoomCustomer = async (ownerId: string, roomId: string, payload: { customerId: string | null; rentalStartDate?: string; monthlyDueDay?: number }) => {
   const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/rooms/${roomId}/customer`, {
     method: "PATCH",
     headers: { ...authHeaders(), "content-type": "application/json" },
-    body: JSON.stringify({ customerId }),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
     const result = await response.json().catch(() => ({})) as { message?: string };

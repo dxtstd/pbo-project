@@ -4,6 +4,7 @@ import Invoice from "../models/invoice";
 import Owner from "../models/owner";
 import Room from "../models/room";
 import Transaction from "../models/transaction";
+import SiteContent from "../models/siteContent";
 
 export const seedDevelopmentUsers = async (): Promise<void> => {
   if (process.env.NODE_ENV === "production") return;
@@ -14,6 +15,25 @@ export const seedDevelopmentUsers = async (): Promise<void> => {
   const now = new Date();
   const hashedOwnerPassword = await bcrypt.hash(ownerPassword, 12);
   const hashedCustomerPassword = await bcrypt.hash(customerPassword, 12);
+
+  await SiteContent.updateOne(
+    { key: "landing" },
+    {
+      $setOnInsert: {
+        key: "landing",
+        siteName: "Kost Camp M2",
+        heroTitle: "Kost Camp M2",
+        heroDescription: "Tinggal dengan suasana nyaman di Kost Camp M2. Lokasi strategis dengan fasilitas lengkap untuk kenyamanan dan ketenangan Anda.",
+        facilitiesTitle: "Fasilitas Kost Camp M2",
+        facilitiesDescription: "Nikmati fasilitas lengkap yang dirancang untuk mendukung aktivitas harian, kenyamanan, dan ketenangan Anda.",
+        contactTitle: "Contact Us",
+        contactDescription: "Hubungi kami untuk informasi lebih lanjut mengenai Kost Camp M2.",
+        location: "Tataaran Satu, Kec. Tondano Sel., Kabupaten Minahasa, Sulawesi Utara, Indonesia",
+        whatsapp: "+62 813-9991-2220",
+      },
+    },
+    { upsert: true },
+  );
 
   await Owner.updateOne(
     { ownerId },
@@ -52,9 +72,9 @@ export const seedDevelopmentUsers = async (): Promise<void> => {
   }
 
   const rooms = [
-    { roomId: "DEV-ROOM-001", customerId: "dev-customer", name: "Kamar Mawar", type: "small", price: 1_200_000, withFurniture: true },
-    { roomId: "DEV-ROOM-002", customerId: "dev-customer-2", name: "Kamar Melati", type: "medium", price: 1_500_000, withFurniture: false },
-    { roomId: "DEV-ROOM-003", customerId: "dev-customer-3", name: "Kamar Anggrek", type: "large", price: 2_100_000, withFurniture: true },
+    { roomId: "DEV-ROOM-001", customerId: "dev-customer", name: "Kamar Mawar", type: "small", price: 1_200_000, withFurniture: true, rentalStartDate: new Date(now.getFullYear(), now.getMonth(), 1), monthlyDueDay: 5 },
+    { roomId: "DEV-ROOM-002", customerId: "dev-customer-2", name: "Kamar Melati", type: "medium", price: 1_500_000, withFurniture: false, rentalStartDate: new Date(now.getFullYear(), now.getMonth(), 3), monthlyDueDay: 15 },
+    { roomId: "DEV-ROOM-003", customerId: "dev-customer-3", name: "Kamar Anggrek", type: "large", price: 2_100_000, withFurniture: true, rentalStartDate: new Date(now.getFullYear(), now.getMonth(), 7), monthlyDueDay: 31 },
   ];
 
   for (const room of rooms) {

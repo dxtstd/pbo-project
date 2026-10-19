@@ -54,7 +54,7 @@ TransactionSchema.post('save', (transaction: ITransaction) => {
       invoiceNumber: transaction.invoiceNumber,
       customerName: `${customer.firstname} ${customer.lastname}`,
       ownerName: `${owner.firstname} ${owner.lastname}`,
-      ownerPhone: owner.phoneNumber,
+      ownerPhone: owner.notificationPhone || owner.phoneNumber,
       amount: transaction.totalAmount,
       paymentMethod: transaction.paymentMethod,
       paymentDate: transaction.paymentDate.toISOString(),
