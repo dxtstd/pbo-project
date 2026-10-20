@@ -15,7 +15,7 @@ export type OwnerData = {
   owner?: { firstname: string; lastname: string; email: string };
   rooms: Room[];
   customers: { customerId: string; username: string; firstname: string; lastname: string; phoneNumber: string }[];
-  invoices: { invoiceNumber: string; customerId: string; roomId: string; amount: number; status: string; dueDate: string }[];
+  invoices: { invoiceNumber: string; customerId: string; roomId: string; amount: number; status: string; dueDate: string; periodStartDate?: string; periodEndDate?: string; periodMonths?: number }[];
   cashPayments?: { transactionId: string; totalAmount: number; invoiceNumber?: string }[];
   transactions: {
     transactionId: string;

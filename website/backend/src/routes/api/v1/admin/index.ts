@@ -4,6 +4,7 @@ import Owner from "../../../../models/owner";
 import SiteContent from "../../../../models/siteContent";
 import { requireAuth, isAdmin } from "../../../../middlewares/auth";
 import { isValidPhoneNumber, normalizePhoneNumber } from "../../../../utils/phone";
+import { nextOwnerId } from "../../../../utils/identifiers";
 
 const admin = Router();
 
@@ -74,14 +75,14 @@ admin.get("/owners", async (_req, res) => {
  *       403: { description: Admin role required }
  */
 admin.post("/owners", async (req, res) => {
-  const { ownerId, username, firstname, lastname, email, phoneNumber, password } = req.body;
-  if (![ownerId, username, firstname, lastname, email, phoneNumber, password].every(Boolean)) {
+  const { username, firstname, lastname, email, phoneNumber, password } = req.body;
+  if (![username, firstname, lastname, email, phoneNumber, password].every(Boolean)) {
     return res.status(400).json({ message: "All owner fields are required" });
   }
   if (!isValidPhoneNumber(String(phoneNumber))) return res.status(400).json({ message: "Nomor telepon tidak valid" });
 
   const owner = await Owner.create({
-    ownerId,
+    ownerId: await nextOwnerId(),
     username,
     firstname,
     lastname,

@@ -49,9 +49,11 @@ services:
       - ./notification/.env.development
     environment:
       ZAPO_SESSION_ID: ${ZAPO_SESSION_ID:-kost-notification-dev}
+      ZAPO_STORE_PATH: /app/.auth/state.sqlite
     volumes:
       - ./notification/src:/app/src
       - notification-node-modules:/app/node_modules
+      - ./notification/.auth:/app/.auth
     expose:
       - "4000"
 

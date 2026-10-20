@@ -1,7 +1,10 @@
 import { createServer } from "node:http";
+import { dirname } from "node:path";
+import { mkdirSync } from "node:fs";
 import env from "dotenv";
 import { WebSocketServer } from "ws";
 import { ConsoleLogger, createStore, WaClient } from "zapo-js";
+import { createSqliteStore } from "@zapo-js/store-sqlite";
 
 const environment = process.env.NODE_ENV || "development";
 env.config({ path: `.env.${environment}` });
@@ -9,36 +12,63 @@ env.config();
 
 const port = Number(process.env.PORT) || 4000;
 const authSessionId = process.env.ZAPO_SESSION_ID || "kost-notification";
+const zapoStorePath = process.env.ZAPO_STORE_PATH || ".auth/state.sqlite";
 
-const store = createStore({});
-const zapo = new WaClient({ store, sessionId: authSessionId }, new ConsoleLogger(
-  process.env.LOG_LEVEL === "debug" ? "debug" : "info",
-));
+mkdirSync(dirname(zapoStorePath), { recursive: true });
+
+const store = createStore({
+  backends: {
+    sqlite: createSqliteStore({ path: zapoStorePath }),
+  },
+  providers: {
+    auth: "sqlite",
+    signal: "sqlite",
+    preKey: "sqlite",
+    session: "sqlite",
+    identity: "sqlite",
+    senderKey: "sqlite",
+    appState: "sqlite",
+    privacyToken: "sqlite",
+    messages: "none",
+    threads: "sqlite",
+    contacts: "sqlite",
+  },
+});
 let latestQr: string | undefined;
 let pairedNumber: string | undefined;
 let connectionStatus = "disconnected";
+let reconnectEnabled = true;
+let zapo: WaClient;
 
-zapo.on("auth_qr", ({ qr }) => {
-  latestQr = qr;
-  connectionStatus = "pairing";
-  console.log(`Scan this QR code to connect WhatsApp:\n${qr}`);
-});
+const createClient = (): WaClient => {
+  const client = new WaClient({ store, sessionId: authSessionId }, new ConsoleLogger(
+    process.env.LOG_LEVEL === "debug" ? "debug" : "info",
+  ));
+  client.on("auth_qr", ({ qr }) => {
+    latestQr = qr;
+    connectionStatus = "pairing";
+    console.log(`Scan this QR code to connect WhatsApp:\n${qr}`);
+  });
 
-zapo.on("auth_paired", ({ credentials }) => {
-  latestQr = undefined;
-  pairedNumber = credentials.meJid;
-  connectionStatus = "open";
-  console.log(`WhatsApp paired as ${credentials.meJid}`);
-});
+  client.on("auth_paired", ({ credentials }) => {
+    latestQr = undefined;
+    pairedNumber = credentials.meJid;
+    connectionStatus = "open";
+    console.log(`WhatsApp paired as ${credentials.meJid}`);
+  });
 
-zapo.on("connection", ({ status }) => {
-  connectionStatus = status;
-  if (status === "open") latestQr = undefined;
-  console.log(`WhatsApp connection status: ${status}`);
-  if (status === "close") {
-    setTimeout(() => void zapo.connect(), 5_000);
-  }
-});
+  client.on("connection", ({ status }) => {
+    connectionStatus = status;
+    if (status === "open") latestQr = undefined;
+    console.log(`WhatsApp connection status: ${status}`);
+    if (status === "close" && reconnectEnabled) {
+      setTimeout(() => void zapo.connect(), 5_000);
+    }
+  });
+  return client;
+};
+
+zapo = createClient();
 
 /**
  * Converts a user-supplied phone number into a WhatsApp JID.
@@ -117,9 +147,30 @@ const server = createServer((request, response) => {
     return;
   }
   if (request.url === "/pair" && request.method === "POST") {
-    void zapo.connect();
+    reconnectEnabled = false;
+    void zapo.logout()
+      .catch((error: unknown) => console.error("Failed to clear WhatsApp session before pairing", error))
+      .finally(() => {
+        latestQr = undefined;
+        pairedNumber = undefined;
+        connectionStatus = "disconnected";
+        reconnectEnabled = true;
+        zapo = createClient();
+        void zapo.connect();
+      });
     response.writeHead(202, { "content-type": "application/json" });
-    response.end(JSON.stringify({ status: connectionStatus, qr: latestQr, pairedNumber }));
+    response.end(JSON.stringify({ status: "pairing" }));
+    return;
+  }
+  if (request.url === "/disconnect" && request.method === "POST") {
+    reconnectEnabled = false;
+    void zapo.disconnect()
+      .then(() => {
+        connectionStatus = "disconnected";
+      })
+      .catch((error: unknown) => console.error("Failed to disconnect WhatsApp", error));
+    response.writeHead(202, { "content-type": "application/json" });
+    response.end(JSON.stringify({ status: "disconnecting" }));
     return;
   }
   if (request.url === "/health") {

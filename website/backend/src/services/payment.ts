@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import Customer from "../models/customer";
 import Invoice from "../models/invoice";
-import Transaction from "../models/transaction";
+import Transaction, { type ITransaction } from "../models/transaction";
 import Room from "../models/room";
 import {
   isSuccessfulMidtransStatus,
@@ -26,8 +26,9 @@ export class PaymentService {
       paymentDate: new Date(),
       totalAmount: invoice.amount,
       status: "cash_pending",
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
-    return { transactionId: transaction.transactionId, status: transaction.status };
+    return { transactionId: transaction.transactionId, status: transaction.status, expiresAt: transaction.expiresAt };
   }
 
   public async createOnlinePayment(invoiceNumber: string, paymentType: MidtransPaymentType, customerId: string) {
@@ -70,6 +71,8 @@ export class PaymentService {
     );
     if (transaction && isSuccessfulMidtransStatus(callback.transaction_status)) {
       await Invoice.updateOne({ invoiceNumber: transaction.invoiceNumber }, { status: "paid" });
+    } else if (transaction && ["expire", "cancel", "deny"].includes(callback.transaction_status)) {
+      await Invoice.updateOne({ invoiceNumber: transaction.invoiceNumber, status: "pending" }, { status: "unpaid" });
     }
   }
 
@@ -99,12 +102,14 @@ export class PaymentService {
   }
 
   private async findUnpaidInvoice(invoiceNumber: string, customerId: string) {
-    const invoice = await Invoice.findOne({ invoiceNumber, customerId, status: { $in: ["unpaid", "overdue"] } });
+    await this.expireTransactions();
+    const invoice = await Invoice.findOne({ invoiceNumber, customerId, status: { $in: ["pending", "unpaid", "overdue"] } });
     if (!invoice) throw new Error("Unpaid invoice not found");
     return invoice;
   }
 
   private async ensureNoActiveTransaction(invoiceNumber: string) {
+    await this.expireTransactions(invoiceNumber);
     const active = await Transaction.exists({
       invoiceNumber,
       $or: [
@@ -113,5 +118,24 @@ export class PaymentService {
       ],
     });
     if (active) throw new Error("Masih ada permintaan pembayaran aktif. Batalkan atau tunggu transaksi sebelumnya selesai.");
+  }
+
+  private async expireTransactions(invoiceNumber?: string) {
+    const activeStatuses: ITransaction["status"][] = ["pending", "cash_pending"];
+    const filter = {
+      status: { $in: activeStatuses },
+      expiresAt: { $lte: new Date() },
+      ...(invoiceNumber ? { invoiceNumber } : {}),
+    };
+    const expired = await Transaction.find(filter).select("invoiceNumber").lean();
+    if (!expired.length) return;
+    await Transaction.updateMany(filter, { $set: { status: "expire" } });
+    const invoiceNumbers = expired
+      .map((transaction) => transaction.invoiceNumber)
+      .filter((value): value is string => Boolean(value));
+    await Invoice.updateMany(
+      { invoiceNumber: { $in: invoiceNumbers }, status: "pending" },
+      { $set: { status: "unpaid" } },
+    );
   }
 }

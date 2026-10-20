@@ -9,6 +9,7 @@ import { requireRole } from "../../../../middlewares/auth";
 import { generateInvoicePdf } from "../../../../services/invoicePdf";
 import { isValidPhoneNumber, normalizePhoneNumber } from "../../../../utils/phone";
 import { createInvoiceForPeriod } from "../../../../services/invoice";
+import { nextCustomerId } from "../../../../utils/identifiers";
 
 const ownerDashboard = Router();
 const furnitureFee = 100000;
@@ -69,7 +70,7 @@ const customerBelongsToOwner = async (ownerId: string, customerId: string): Prom
  *       required: true
  *       content:
  *         application/json:
- *           schema: { type: object, required: [customerId, username, firstname, lastname, phoneNumber, password] }
+ *           schema: { type: object, required: [username, firstname, phoneNumber, password] }
  *     responses:
  *       201: { description: Customer created }
  *       400: { description: Missing required field }
@@ -78,14 +79,14 @@ const customerBelongsToOwner = async (ownerId: string, customerId: string): Prom
  */
 ownerDashboard.post("/:ownerId/customers", async (req, res) => {
   if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot manage these customers" });
-  const { customerId, username, firstname, lastname, phoneNumber, password } = req.body;
-  if (![customerId, username, firstname, lastname, phoneNumber, password].every(Boolean)) {
+  const { username, firstname, lastname, phoneNumber, password } = req.body;
+  if (![username, firstname, phoneNumber, password].every(Boolean)) {
     return res.status(400).json({ message: "All customer fields are required" });
   }
   if (!isValidPhoneNumber(String(phoneNumber))) return res.status(400).json({ message: "Nomor telepon tidak valid" });
   const bcrypt = await import("bcrypt");
   const customer = await Customer.create({
-    customerId, ownerId: req.params.ownerId, username, firstname, lastname, phoneNumber: normalizePhoneNumber(String(phoneNumber)),
+    customerId: await nextCustomerId(), ownerId: req.params.ownerId, username, firstname, lastname: String(lastname || "").trim(), phoneNumber: normalizePhoneNumber(String(phoneNumber)),
     password: await bcrypt.hash(String(password), 12),
   });
   const { password: _password, ...safeCustomer } = customer.toObject();
@@ -236,6 +237,17 @@ ownerDashboard.post("/:ownerId/notification/pair", async (req, res) => {
   }
 });
 
+ownerDashboard.post("/:ownerId/notification/disconnect", async (req, res) => {
+  if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot disconnect this notification setup" });
+  try {
+    const response = await fetch(`${config.notificationHttpUrl}/disconnect`, { method: "POST" });
+    if (!response.ok) return res.status(502).json({ message: "Notification disconnect failed" });
+    return res.json(await response.json());
+  } catch {
+    return res.status(503).json({ message: "Notification service unavailable" });
+  }
+});
+
 ownerDashboard.put("/:ownerId/notification/phone", async (req, res) => {
   if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot update this notification setup" });
   const phone = normalizePhoneNumber(String(req.body.phone || ""));
@@ -379,7 +391,11 @@ ownerDashboard.get("/:ownerId/invoices/:invoiceNumber/pdf", async (req, res) => 
       const room = await Room.findOne({ roomId: invoice.roomId, ownerId: req.params.ownerId }).select("roomId").lean();
       if (!room) return res.status(403).json({ message: "Invoice does not belong to this owner" });
       if (invoice.status === "paid") return res.status(409).json({ message: "Invoice yang sudah lunas tidak dapat dihapus" });
-      await Invoice.deleteOne({ invoiceNumber: req.params.invoiceNumber });
+      await Transaction.updateMany(
+        { invoiceNumber: invoice.invoiceNumber, status: { $in: ["pending", "cash_pending"] } },
+        { $set: { status: "cancel" } },
+      );
+      await Invoice.updateOne({ invoiceNumber: req.params.invoiceNumber }, { $set: { status: "cancelled" } });
       return res.status(204).send();
     });
     res.setHeader("content-type", "application/pdf");
@@ -525,8 +541,8 @@ ownerDashboard.patch("/:ownerId/rooms/:roomId/customer", async (req, res) => {
   if (Number.isNaN(startDate.getTime())) return res.status(400).json({ message: "Tanggal mulai sewa tidak valid" });
   const dueDay = monthlyDueDay;
   const rentalMonths = req.body.rentalMonths === undefined ? 1 : Number(req.body.rentalMonths);
-  if (!Number.isInteger(rentalMonths) || rentalMonths < 1 || rentalMonths > 10) {
-    return res.status(400).json({ message: "Durasi sewa harus antara 1 sampai 10 bulan" });
+  if (!Number.isInteger(rentalMonths) || rentalMonths < 1 || rentalMonths > 12) {
+    return res.status(400).json({ message: "Durasi sewa harus antara 1 sampai 12 bulan" });
   }
   if (customerId) {
     const customer = await Customer.findOne({ customerId, ownerId: req.params.ownerId }).select("customerId").lean();

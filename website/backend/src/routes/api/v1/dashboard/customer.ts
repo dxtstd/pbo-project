@@ -17,10 +17,70 @@ customerDashboard.get("/:customerId", async (req, res) => {
   const customer = await Customer.findOne({ customerId: req.params.customerId }).lean();
   if (!customer) return res.status(404).json({ message: "Customer not found" });
 
-  const invoices = await Invoice.find({ customerId: customer.customerId }).sort({ dueDate: 1 }).lean();
   const room = await Room.findOne({ customerId: customer.customerId }).lean();
+  const expiredTransactions = await Transaction.find({
+    customerId: customer.customerId,
+    status: { $in: ["pending", "cash_pending"] },
+    expiresAt: { $lte: new Date() },
+  }).select("transactionId invoiceNumber").lean();
+  if (expiredTransactions.length) {
+    const expiredInvoiceNumbers = expiredTransactions
+      .map((transaction) => transaction.invoiceNumber)
+      .filter((invoiceNumber): invoiceNumber is string => Boolean(invoiceNumber));
+    await Transaction.updateMany(
+      { transactionId: { $in: expiredTransactions.map((transaction) => transaction.transactionId) } },
+      { $set: { status: "expire" } },
+    );
+    await Invoice.updateMany(
+      { invoiceNumber: { $in: expiredInvoiceNumbers }, status: "pending" },
+      { $set: { status: "unpaid" } },
+    );
+  }
+  const invoices = await Invoice.find({ customerId: customer.customerId }).sort({ dueDate: 1 }).lean();
   const transactions = await Transaction.find({ customerId: customer.customerId }).sort({ createdAt: -1 }).limit(20).lean();
   return res.json({ customer, room, invoices, transactions });
+});
+
+customerDashboard.post("/:customerId/invoices/extend", async (req, res) => {
+  if (req.user?.role !== "customer" || req.user.id !== req.params.customerId) {
+    return res.status(403).json({ message: "Cannot request this extension" });
+  }
+  const months = Number(req.body.months);
+  if (!Number.isInteger(months) || months < 1 || months > 12) {
+    return res.status(400).json({ message: "Durasi perpanjangan harus antara 1 sampai 12 bulan" });
+  }
+  const room = await Room.findOne({ customerId: req.params.customerId, isOccupied: true }).lean();
+  if (!room) return res.status(404).json({ message: "Kamar aktif tidak ditemukan" });
+  const pendingRequest = await Invoice.exists({
+    customerId: req.params.customerId,
+    roomId: room.roomId,
+    status: "pending",
+  });
+  if (pendingRequest) return res.status(409).json({ message: "Perpanjangan sebelumnya masih menunggu pembayaran atau pembatalan owner" });
+  const unpaidInvoice = await Invoice.exists({
+    customerId: req.params.customerId,
+    roomId: room.roomId,
+    status: { $in: ["unpaid", "overdue"] },
+  });
+  if (unpaidInvoice) return res.status(409).json({ message: "Selesaikan invoice aktif terlebih dahulu sebelum mengajukan perpanjangan" });
+  const latestInvoice = await Invoice.findOne({
+    customerId: req.params.customerId,
+    roomId: room.roomId,
+    status: "paid",
+  }).sort({ periodEndDate: -1, dueDate: -1 }).lean();
+  if (!latestInvoice) return res.status(409).json({ message: "Perpanjangan tersedia setelah pembayaran sewa berhasil dikonfirmasi" });
+  const startDate = latestInvoice?.periodEndDate
+    ? new Date(latestInvoice.periodEndDate)
+    : new Date(room.rentalStartDate || new Date());
+  startDate.setMonth(startDate.getMonth() + 1);
+  const invoice = await createInvoiceForPeriod({
+    customerId: req.params.customerId,
+    roomId: room.roomId,
+    startDate,
+    months,
+    status: "pending",
+  });
+  return res.status(201).json({ invoice });
 });
 
 customerDashboard.post("/:customerId/invoices/combined", async (req, res) => {
@@ -28,11 +88,17 @@ customerDashboard.post("/:customerId/invoices/combined", async (req, res) => {
     return res.status(403).json({ message: "Cannot create this invoice" });
   }
   const months = Number(req.body.months);
-  if (!Number.isInteger(months) || months < 2 || months > 10) {
-    return res.status(400).json({ message: "Pilih periode pembayaran antara 2 sampai 10 bulan" });
+  if (!Number.isInteger(months) || months < 2 || months > 12) {
+    return res.status(400).json({ message: "Pilih periode pembayaran antara 2 sampai 12 bulan" });
   }
   const room = await Room.findOne({ customerId: req.params.customerId }).lean();
   if (!room) return res.status(404).json({ message: "Kamar aktif tidak ditemukan" });
+  const pendingRequest = await Invoice.exists({
+    customerId: req.params.customerId,
+    roomId: room.roomId,
+    status: "pending",
+  });
+  if (pendingRequest) return res.status(409).json({ message: "Perpanjangan sebelumnya masih menunggu pembayaran atau pembatalan owner" });
   const activeInvoices = await Invoice.find({
     customerId: req.params.customerId,
     roomId: room.roomId,
@@ -74,6 +140,7 @@ customerDashboard.post("/:customerId/invoices/combined", async (req, res) => {
     roomId: room.roomId,
     startDate,
     months,
+    status: "pending",
   });
   return res.status(201).json({ invoice });
 });

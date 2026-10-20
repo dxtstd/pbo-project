@@ -24,7 +24,11 @@ export const createInvoiceForPeriod = async (input: {
   roomId: string;
   startDate: Date;
   months: number;
+  status?: "pending" | "unpaid";
 }) => {
+  if (!Number.isInteger(input.months) || input.months < 1 || input.months > 12) {
+    throw new Error("Durasi invoice harus antara 1 sampai 12 bulan");
+  }
   const [customer, room] = await Promise.all([
     Customer.findOne({ customerId: input.customerId }).select("firstname lastname").lean(),
     Room.findOne({ roomId: input.roomId }).select("name price").lean(),
@@ -50,7 +54,7 @@ export const createInvoiceForPeriod = async (input: {
     totalAmount: amount,
     amount,
     dueDate: input.startDate,
-    status: "unpaid",
+    status: input.status || "unpaid",
     customerName: `${customer.firstname} ${customer.lastname}`.trim(),
     roomName: room.name,
     periodStartDate: input.startDate,

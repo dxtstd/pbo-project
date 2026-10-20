@@ -17,7 +17,7 @@ import { AdminDashboard } from './pages/Admin';
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-[#F5EBE6] font-sans">
+    <div className="min-h-screen w-full bg-[#F5EBE6] font-sans">
       <BrowserRouter>
         <AppRoutes />
       </BrowserRouter>

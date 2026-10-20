@@ -4,6 +4,7 @@ import { loadOwnerDashboard } from "./api";
 import type { OwnerData } from "./types";
 import { Toast } from "../../../components/Toast";
 import { useAuthStore } from "../../../stores/auth";
+import { ApiLoading } from "../../../components/ApiLoading";
 
 export function OwnerLayout() {
   const navigate = useNavigate();
@@ -17,7 +18,7 @@ export function OwnerLayout() {
     try {
       setData(await loadOwnerDashboard(ownerId));
     } catch {
-      navigate("/login");
+      setMessage("Server belum siap. Mohon menunggu lalu coba lagi.");
     }
   };
 
@@ -28,7 +29,7 @@ export function OwnerLayout() {
     }
     void loadOwnerDashboard(ownerId)
       .then(setData)
-      .catch(() => navigate("/login"));
+      .catch(() => setMessage("Server belum siap. Mohon menunggu lalu coba lagi."));
   }, [ownerId, navigate]);
 
   const logout = () => {
@@ -36,7 +37,7 @@ export function OwnerLayout() {
     setData(undefined);
     navigate("/login", { replace: true });
   };
-  if (!data) return <main className="min-h-screen bg-[#efe2d6] p-8 text-[#765e52]">Memuat dashboard...</main>;
+  if (!data) return <ApiLoading />;
 
   const ownerName = data.owner?.firstname || "Pemilik";
   const navigation = [
@@ -51,13 +52,13 @@ export function OwnerLayout() {
   return (
     <main className="min-h-screen bg-[#efe2d6] text-[#3e2f28]">
       <div className="mx-auto flex min-h-screen max-w-[1500px]">
-        <aside className="hidden w-64 shrink-0 border-r border-[#dcc2b3] bg-[#f8eee7] px-6 py-8 lg:block">
+        <aside className="hidden w-64 shrink-0 flex-col border-r border-[#dcc2b3] bg-[#f8eee7] px-6 py-8 lg:flex">
           <div className="font-serif text-xl font-bold">Kost Lorem Ipsum</div>
           <p className="mt-1 text-xs text-[#765e52]">Panel pengelolaan</p>
           <nav className="mt-12 space-y-2 text-sm">
             {navigation.map((item) => <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `block rounded-xl px-4 py-3 ${isActive ? "bg-[#694536] font-semibold text-white" : "text-[#765e52] hover:bg-[#ead0c2]"}`}>{item.label}</NavLink>)}
           </nav>
-          <button type="button" onClick={logout} className="mt-[45vh] text-sm text-[#765e52] hover:text-[#694536]">Keluar akun</button>
+          <button type="button" onClick={logout} className="mt-auto rounded-lg border border-[#caa897] px-4 py-2 text-sm font-medium text-[#3e2f28] transition hover:bg-[#ead0c2]">Keluar</button>
         </aside>
         <div className="min-w-0 flex-1 px-4 py-5 sm:px-8 lg:px-10 lg:py-8">
           <header className="mb-6 flex items-start justify-between gap-3 sm:mb-8 sm:items-center">

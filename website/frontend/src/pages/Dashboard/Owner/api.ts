@@ -55,7 +55,7 @@ export const assignRoomCustomer = async (ownerId: string, roomId: string, payloa
 };
 
 export type CustomerPayload = {
-  customerId: string;
+  customerId?: string;
   username: string;
   firstname: string;
   lastname: string;
