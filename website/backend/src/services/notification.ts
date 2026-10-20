@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import WebSocket from "ws";
 import NotificationTemplate from "../models/notificationTemplate";
 import SiteContent from "../models/siteContent";
@@ -48,7 +49,7 @@ export const isNotificationCategoryEnabled = async (ownerId: string | undefined,
   return owner?.notificationPreferences?.[category] !== false;
 };
 
-export type NotificationEvent =
+type NotificationEventPayload =
   | {
       type: "invoice_created";
       invoiceNumber: string;
@@ -106,6 +107,10 @@ export type NotificationEvent =
       message?: string;
     };
 
+export type NotificationEvent = NotificationEventPayload & {
+  deliveryId?: string;
+};
+
 const websocketUrl = process.env.NOTIFICATION_WS_URL || "ws://notification:4000";
 const reconnectDelayMs = 5_000;
 
@@ -142,39 +147,60 @@ class NotificationBridge {
   }
 
   publish(event: NotificationEvent): void {
+    const eventWithId = event.deliveryId ? event : { ...event, deliveryId: crypto.randomUUID() };
     logger.info({
-      eventType: event.type,
-      invoiceNumber: "invoiceNumber" in event ? event.invoiceNumber : undefined,
-      recipient: "recipientPhone" in event ? event.recipientPhone : ("customerPhone" in event ? event.customerPhone : event.ownerPhone),
-      queued: this.socket?.readyState !== WebSocket.OPEN,
+      deliveryId: eventWithId.deliveryId,
+      eventType: eventWithId.type,
+      invoiceNumber: "invoiceNumber" in eventWithId ? eventWithId.invoiceNumber : undefined,
+      recipient: "recipientPhone" in eventWithId ? eventWithId.recipientPhone : ("customerPhone" in eventWithId ? eventWithId.customerPhone : eventWithId.ownerPhone),
+      notificationHttpUrl: config.notificationHttpUrl,
+      websocketReady: this.socket?.readyState === WebSocket.OPEN,
     }, "Notification event published");
-    void this.sendHttp(event).catch((error: unknown) => {
-      logger.error({ err: error, eventType: event.type }, "Failed to send notification over HTTP");
+    void this.sendHttp(eventWithId).catch((error: unknown) => {
+      logger.error({ err: error, deliveryId: eventWithId.deliveryId, eventType: eventWithId.type }, "Failed to send notification over HTTP");
       if (this.socket?.readyState === WebSocket.OPEN) {
-        this.socket.send(JSON.stringify(event), (socketError) => {
+        this.socket.send(JSON.stringify(eventWithId), (socketError) => {
           if (socketError) {
-            logger.error({ err: socketError, eventType: event.type }, "Failed to send notification over WebSocket fallback");
-            this.pendingEvents.push(event);
+            logger.error({ err: socketError, deliveryId: eventWithId.deliveryId, eventType: eventWithId.type }, "Failed to send notification over WebSocket fallback");
+            this.pendingEvents.push(eventWithId);
           }
         });
       } else {
-        this.pendingEvents.push(event);
+        this.pendingEvents.push(eventWithId);
         this.connect();
       }
     });
   }
 
   private async sendHttp(event: NotificationEvent): Promise<void> {
+    const startedAt = Date.now();
     const response = await fetch(`${config.notificationHttpUrl}/event`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(event),
     });
+    const responseBody = await response.text().catch(() => "");
     if (!response.ok) {
-      const detail = await response.text().catch(() => "");
+      const detail = responseBody;
       throw new Error(`Notification service returned ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`);
     }
-    logger.info({ eventType: event.type }, "Notification event delivered to notification service");
+    let acknowledgement: { sent?: boolean } = {};
+    try {
+      acknowledgement = JSON.parse(responseBody) as { sent?: boolean };
+    } catch {
+      throw new Error(`Notification service returned invalid acknowledgement: ${responseBody.slice(0, 200)}`);
+    }
+    if (acknowledgement.sent !== true) {
+      throw new Error(`Notification service did not confirm delivery: ${responseBody.slice(0, 200)}`);
+    }
+    logger.info({
+      deliveryId: event.deliveryId,
+      eventType: event.type,
+      statusCode: response.status,
+      durationMs: Date.now() - startedAt,
+      notificationHttpUrl: config.notificationHttpUrl,
+      acknowledged: acknowledgement.sent,
+    }, "Notification event delivered to notification service");
   }
 
   private flush(): void {

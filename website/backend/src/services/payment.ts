@@ -45,7 +45,18 @@ export class PaymentService {
     ]);
     const owner = room?.ownerId ? await Owner.findOne({ ownerId: room.ownerId }).select("firstname lastname phoneNumber notificationPhone").lean() : undefined;
     const ownerPhone = owner?.notificationPhone || owner?.phoneNumber;
-    if (customer && owner && ownerPhone && await isNotificationCategoryEnabled(room?.ownerId, "cash_requested")) {
+    const notificationEnabled = await isNotificationCategoryEnabled(room?.ownerId, "cash_requested");
+    logger.info({
+      transactionId: transaction.transactionId,
+      invoiceNumber: invoice.invoiceNumber,
+      ownerId: room?.ownerId,
+      ownerPhoneSource: owner?.notificationPhone ? "notificationPhone" : owner?.phoneNumber ? "phoneNumber" : "none",
+      hasCustomer: Boolean(customer),
+      hasOwner: Boolean(owner),
+      hasOwnerPhone: Boolean(ownerPhone),
+      notificationEnabled,
+    }, "Evaluating cash request notification");
+    if (customer && owner && ownerPhone && notificationEnabled) {
       const message = await renderNotificationTemplate("cash_requested", {
         customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
         invoice_number: invoice.invoiceNumber,
@@ -62,6 +73,13 @@ export class PaymentService {
         expiresAt: transaction.expiresAt!.toISOString(),
         message,
       });
+      logger.info({
+        transactionId: transaction.transactionId,
+        invoiceNumber: invoice.invoiceNumber,
+        ownerId: room.ownerId,
+        ownerPhone,
+        amount: invoice.amount,
+      }, "Cash request notification queued for owner");
     } else {
       logger.warn({
         invoiceNumber: invoice.invoiceNumber,
@@ -70,6 +88,7 @@ export class PaymentService {
         hasCustomer: Boolean(customer),
         hasOwner: Boolean(owner),
         hasOwnerPhone: Boolean(ownerPhone),
+        notificationEnabled,
       }, "Cash request notification skipped");
     }
     return { transactionId: transaction.transactionId, status: transaction.status, expiresAt: transaction.expiresAt };

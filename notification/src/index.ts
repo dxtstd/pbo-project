@@ -150,14 +150,37 @@ const sendEvent = async (event: Record<string, unknown>): Promise<void> => {
       ].join("\n");
 
   logger.info({
+    deliveryId: event.deliveryId,
     eventType: event.type,
     invoiceNumber: event.invoiceNumber,
     recipient: redactPhone(recipient),
+    recipientJid: redactPhone(recipientJid),
     connectionStatus,
+    zapoState: zapo.getState(),
+    pairedNumber: pairedNumber ? redactPhone(pairedNumber) : undefined,
     messageLength: message.length,
   }, "Sending automatic WhatsApp notification");
-  await zapo.message.send(recipientJid, message);
-  logger.info({ eventType: event.type, recipient: redactPhone(recipient) }, "Automatic WhatsApp notification sent");
+  try {
+    await zapo.message.send(recipientJid, message);
+  } catch (error) {
+    logger.error({
+      err: error,
+      deliveryId: event.deliveryId,
+      eventType: event.type,
+      recipient: redactPhone(recipient),
+      recipientJid: redactPhone(recipientJid),
+      connectionStatus,
+      zapoState: zapo.getState(),
+    }, "Automatic WhatsApp notification send failed");
+    throw error;
+  }
+  logger.info({
+    deliveryId: event.deliveryId,
+    eventType: event.type,
+    recipient: redactPhone(recipient),
+    recipientJid: redactPhone(recipientJid),
+    connectionStatus,
+  }, "Automatic WhatsApp notification sent");
 };
 
 /**
@@ -199,13 +222,20 @@ const server = createServer((request, response) => {
         response.end(JSON.stringify({ message: "Invalid notification event JSON" }));
         return;
       }
+      logger.info({
+        deliveryId: event.deliveryId,
+        eventType: event.type,
+        invoiceNumber: event.invoiceNumber,
+        recipient: redactPhone(String(event.recipientPhone || event.customerPhone || event.ownerPhone || "")),
+      }, "HTTP notification event received");
       void sendEvent(event)
         .then(() => {
+          logger.info({ deliveryId: event.deliveryId, eventType: event.type }, "HTTP notification event acknowledged after WhatsApp send");
           response.writeHead(200, { "content-type": "application/json" });
           response.end(JSON.stringify({ sent: true }));
         })
         .catch((error: unknown) => {
-          logger.error({ err: error, endpoint: "/event" }, "Failed to deliver HTTP notification event");
+          logger.error({ err: error, deliveryId: event.deliveryId, eventType: event.type, endpoint: "/event" }, "Failed to deliver HTTP notification event");
           response.writeHead(503, { "content-type": "application/json" });
           response.end(JSON.stringify({ message: error instanceof Error ? error.message : "Notification event failed" }));
         });

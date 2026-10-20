@@ -73,6 +73,14 @@ export const createInvoiceForPeriod = async (input: {
     status: invoice.status,
   }, "Invoice created");
   const invoiceNotificationEnabled = await isNotificationCategoryEnabled(room.ownerId, "invoice_created");
+  logger.info({
+    invoiceNumber: invoice.invoiceNumber,
+    customerId: input.customerId,
+    customerPhone: customer.phoneNumber || undefined,
+    ownerId: room.ownerId,
+    notificationEnabled: invoiceNotificationEnabled,
+    notifyCreated: input.notifyCreated !== false,
+  }, "Evaluating invoice-created notification");
   if (input.notifyCreated !== false && customer.phoneNumber && invoiceNotificationEnabled) {
     const message = await renderNotificationTemplate("invoice_created", {
       customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
@@ -89,6 +97,12 @@ export const createInvoiceForPeriod = async (input: {
       dueDate: invoice.dueDate.toISOString().slice(0, 10),
       message,
     });
+    logger.info({
+      invoiceNumber: invoice.invoiceNumber,
+      customerId: input.customerId,
+      customerPhone: customer.phoneNumber,
+      amount: invoice.amount,
+    }, "Invoice-created notification queued for customer");
   } else if (input.notifyCreated !== false) {
     logger.warn({
       invoiceNumber: invoice.invoiceNumber,
