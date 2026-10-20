@@ -23,6 +23,8 @@ for backend requests. Nginx also proxies `/notification/` to that service
 instead of targeting a container IP, so changing container IPs does not make
 the reverse proxy stale.
 
-The notification Docker images install Python, Make, and g++ before installing
-dependencies. These tools are required to compile the native `better-sqlite3`
-module through `node-gyp` during the image build.
+The notification Docker images use Node 22, for which the pinned
+`better-sqlite3` dependency provides a Linux prebuilt binary. This avoids
+requiring an `apt-get update` or a native compiler toolchain during the image
+build. Dependency installation uses the lockfile and a BuildKit npm cache, so
+rebuilding the notification image avoids downloading unchanged packages.
