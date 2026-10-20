@@ -26,5 +26,5 @@ the reverse proxy stale.
 The notification Docker images use Node 22, for which the pinned
 `better-sqlite3` dependency provides a Linux prebuilt binary. This avoids
 requiring an `apt-get update` or a native compiler toolchain during the image
-build. Dependency installation uses the lockfile and a BuildKit npm cache, so
-rebuilding the notification image avoids downloading unchanged packages.
+build. Dependency installation uses the lockfile, and Docker can reuse the
+dependency layer whenever the package manifests are unchanged.
