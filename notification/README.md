@@ -22,3 +22,7 @@ The notification service keeps its internal Docker hostname (`notification`)
 for backend requests. Nginx also proxies `/notification/` to that service
 instead of targeting a container IP, so changing container IPs does not make
 the reverse proxy stale.
+
+The notification Docker images install Python, Make, and g++ before installing
+dependencies. These tools are required to compile the native `better-sqlite3`
+module through `node-gyp` during the image build.
