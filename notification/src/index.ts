@@ -91,7 +91,8 @@ const normalizePhone = (phone: string): string => {
 const sendEvent = async (event: Record<string, unknown>): Promise<void> => {
   if (!["invoice_created", "invoice_due", "cash_requested", "payment_received"].includes(String(event.type))) return;
 
-  const recipient = String(["invoice_created", "invoice_due"].includes(String(event.type)) ? event.customerPhone : event.ownerPhone);
+  const recipientValue = ["invoice_created", "invoice_due"].includes(String(event.type)) ? event.customerPhone : event.ownerPhone;
+  const recipient = typeof recipientValue === "string" ? recipientValue.trim() : "";
   if (!recipient) throw new Error("Notification event has no recipient phone number");
 
   const message = event.type === "invoice_created"
@@ -133,7 +134,7 @@ const sendEvent = async (event: Record<string, unknown>): Promise<void> => {
  */
 const sendTestMessage = async (body: string): Promise<void> => {
   const payload = JSON.parse(body) as { recipient?: string; message?: string };
-  if (!payload.recipient || !payload.message) throw new Error("Test notification requires recipient and message");
+  if (!payload.recipient?.trim() || !payload.message?.trim()) throw new Error("Test notification requires recipient and message");
   if (connectionStatus !== "open") throw new Error("WhatsApp is not connected");
   await zapo.message.send(normalizePhone(payload.recipient), payload.message);
 };

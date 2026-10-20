@@ -10,6 +10,7 @@ import SiteContent from "../../../../models/siteContent";
 import { requireAuth, isAdmin } from "../../../../middlewares/auth";
 import { isValidPhoneNumber, normalizePhoneNumber } from "../../../../utils/phone";
 import { nextOwnerId } from "../../../../utils/identifiers";
+import { config } from "../../../../config/env";
 
 const admin = Router();
 const RESET_CONFIRMATION = "RESET-ALL";
@@ -55,6 +56,53 @@ admin.put("/site-content", async (req, res) => {
     { new: true, upsert: true, runValidators: true },
   ).lean();
   return res.json({ content });
+});
+
+admin.get("/notification/recipients", async (_req, res) => {
+  const [owners, customers] = await Promise.all([
+    Owner.find().select("ownerId firstname lastname phoneNumber notificationPhone").lean(),
+    Customer.find().select("customerId firstname lastname phoneNumber").lean(),
+  ]);
+  let status: unknown = { status: "unknown" };
+  try {
+    const response = await fetch(`${config.notificationHttpUrl}/status`);
+    if (response.ok) status = await response.json();
+  } catch {
+    status = { status: "unavailable" };
+  }
+  return res.json({
+    status,
+    owners: owners.map((owner) => ({
+      id: owner.ownerId,
+      label: `Owner: ${owner.firstname} ${owner.lastname}`.trim(),
+      phone: owner.notificationPhone || owner.phoneNumber,
+    })),
+    customers: customers.map((customer) => ({
+      id: customer.customerId,
+      label: `Customer: ${customer.firstname} ${customer.lastname}`.trim(),
+      phone: customer.phoneNumber,
+    })),
+  });
+});
+
+admin.post("/notification/test", async (req, res) => {
+  const recipient = typeof req.body?.recipient === "string" ? req.body.recipient.trim() : "";
+  const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+  if (!recipient || !message) return res.status(400).json({ message: "Nomor penerima dan pesan wajib diisi" });
+  const phone = normalizePhoneNumber(recipient);
+  if (!isValidPhoneNumber(phone)) return res.status(400).json({ message: "Nomor WhatsApp tidak valid" });
+  try {
+    const response = await fetch(`${config.notificationHttpUrl}/test`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ recipient: phone, message }),
+    });
+    const result = await response.json().catch(() => ({})) as { message?: string };
+    if (!response.ok) return res.status(502).json({ message: result.message || "Test notification gagal dikirim" });
+    return res.json({ sent: true });
+  } catch {
+    return res.status(503).json({ message: "Notification service unavailable" });
+  }
 });
 
 /**

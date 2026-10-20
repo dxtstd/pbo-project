@@ -1,8 +1,4 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import Customer from './customer';
-import Owner from './owner';
-import Room from './room';
-import { publishPaymentReceived } from '../services/notification';
 
 export interface ITransaction extends Document {
   transactionId: string;
@@ -36,38 +32,6 @@ const TransactionSchema: Schema = new Schema({
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true },
-});
-
-TransactionSchema.post('save', (transaction: ITransaction) => {
-  if (!['settlement', 'capture', 'confirmed'].includes(transaction.status)) return;
-
-  void (async () => {
-    const [customer, room] = await Promise.all([
-      Customer.findOne({ customerId: transaction.customerId }).lean(),
-      Room.findOne({ roomId: transaction.roomId }).lean(),
-    ]);
-    const owner = room?.ownerId
-      ? await Owner.findOne({ ownerId: room.ownerId }).lean()
-      : undefined;
-
-    if (!customer || !owner) {
-      console.error(`Cannot notify payment ${transaction.transactionId}: customer or owner not found`);
-      return;
-    }
-
-    publishPaymentReceived({
-      type: 'payment_received',
-      invoiceNumber: transaction.invoiceNumber,
-      customerName: `${customer.firstname} ${customer.lastname}`,
-      ownerName: `${owner.firstname} ${owner.lastname}`,
-      ownerPhone: owner.notificationPhone || owner.phoneNumber,
-      amount: transaction.totalAmount,
-      paymentMethod: transaction.paymentMethod,
-      paymentDate: transaction.paymentDate.toISOString(),
-    });
-  })().catch((error) => {
-    console.error(`Failed to publish payment ${transaction.transactionId} notification`, error);
-  });
 });
 
 TransactionSchema.virtual('customer', {

@@ -4,7 +4,7 @@ import Invoice from "../models/invoice";
 import Transaction, { type ITransaction } from "../models/transaction";
 import Room from "../models/room";
 import Owner from "../models/owner";
-import { publishCashRequested } from "./notification";
+import { publishCashRequested, publishPaymentReceived } from "./notification";
 import {
   isSuccessfulMidtransStatus,
   type MidtransCharge,
@@ -89,12 +89,13 @@ export class PaymentService {
   public async processMidtransCallback(callback: MidtransCharge): Promise<void> {
     if (!this.gateway.verifyCallback(callback)) throw new Error("Invalid Midtrans signature");
     const transaction = await Transaction.findOneAndUpdate(
-      { midtransOrderId: callback.order_id },
+      { midtransOrderId: callback.order_id, status: { $nin: ["settlement", "capture", "confirmed"] } },
       { status: callback.transaction_status },
       { new: true },
     );
     if (transaction && isSuccessfulMidtransStatus(callback.transaction_status)) {
       await Invoice.updateOne({ invoiceNumber: transaction.invoiceNumber }, { status: "paid" });
+      await this.publishPaymentReceived(transaction);
     } else if (transaction && ["expire", "cancel", "deny"].includes(callback.transaction_status)) {
       await Invoice.updateOne({ invoiceNumber: transaction.invoiceNumber, status: "pending" }, { status: "unpaid" });
     }
@@ -112,7 +113,31 @@ export class PaymentService {
     );
     if (!transaction) throw new Error("Cash payment not found or already confirmed");
     await Invoice.updateOne({ invoiceNumber: transaction.invoiceNumber }, { status: "paid" });
+    await this.publishPaymentReceived(transaction);
     return { transactionId: transaction.transactionId, status: transaction.status };
+  }
+
+  private async publishPaymentReceived(transaction: ITransaction): Promise<void> {
+    const [customer, room] = await Promise.all([
+      Customer.findOne({ customerId: transaction.customerId }).lean(),
+      Room.findOne({ roomId: transaction.roomId }).lean(),
+    ]);
+    const owner = room?.ownerId ? await Owner.findOne({ ownerId: room.ownerId }).lean() : undefined;
+    const ownerPhone = owner?.notificationPhone || owner?.phoneNumber;
+    if (!customer || !owner || !ownerPhone) {
+      console.error(`Cannot notify payment ${transaction.transactionId}: customer, owner, or owner phone not found`);
+      return;
+    }
+    publishPaymentReceived({
+      type: "payment_received",
+      invoiceNumber: transaction.invoiceNumber,
+      customerName: `${customer.firstname} ${customer.lastname}`.trim(),
+      ownerName: `${owner.firstname} ${owner.lastname}`.trim(),
+      ownerPhone,
+      amount: transaction.totalAmount,
+      paymentMethod: transaction.paymentMethod,
+      paymentDate: transaction.paymentDate.toISOString(),
+    });
   }
 
   public async cancelCash(transactionId: string, customerId: string) {

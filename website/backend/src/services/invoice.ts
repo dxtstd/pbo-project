@@ -1,7 +1,6 @@
 import Customer from "../models/customer";
 import Invoice from "../models/invoice";
 import Room from "../models/room";
-import Owner from "../models/owner";
 import { publishInvoiceCreated } from "./notification";
 
 const addMonths = (date: Date, months: number): Date => {
@@ -63,10 +62,7 @@ export const createInvoiceForPeriod = async (input: {
     periodEndDate: endDate,
     periodMonths: input.months,
   });
-  const owner = room.ownerId
-    ? await Owner.findOne({ ownerId: room.ownerId }).select("firstname lastname").lean()
-    : undefined;
-  if (owner && customer.phoneNumber) {
+  if (customer.phoneNumber) {
     publishInvoiceCreated({
       invoiceNumber: invoice.invoiceNumber,
       customerName: `${customer.firstname} ${customer.lastname}`.trim(),
@@ -75,7 +71,7 @@ export const createInvoiceForPeriod = async (input: {
       dueDate: invoice.dueDate.toISOString().slice(0, 10),
     });
   } else {
-    console.error(`Cannot notify invoice ${invoice.invoiceNumber}: owner or customer phone not found`);
+    console.error(`Cannot notify invoice ${invoice.invoiceNumber}: customer phone not found`);
   }
   return invoice;
 };
