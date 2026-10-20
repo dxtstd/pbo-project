@@ -3,12 +3,27 @@ import { dirname } from "node:path";
 import { mkdirSync } from "node:fs";
 import env from "dotenv";
 import { WebSocketServer } from "ws";
+import pino from "pino";
+import pretty from "pino-pretty";
 import { ConsoleLogger, createStore, WaClient } from "zapo-js";
 import { createSqliteStore } from "@zapo-js/store-sqlite";
 
 const environment = process.env.NODE_ENV || "development";
 env.config({ path: `.env.${environment}` });
 env.config();
+
+const logger = pino(
+  {
+    level: process.env.LOG_LEVEL || "info",
+    base: undefined,
+    timestamp: pino.stdTimeFunctions.isoTime,
+  },
+  pretty({
+    colorize: true,
+    translateTime: "SYS:standard",
+    ignore: "pid,hostname",
+  }),
+);
 
 const port = Number(process.env.PORT) || 4000;
 const authSessionId = process.env.ZAPO_SESSION_ID || "kost-notification";
@@ -41,26 +56,27 @@ let reconnectEnabled = true;
 let zapo: WaClient;
 
 const createClient = (): WaClient => {
+  logger.info({ sessionId: authSessionId }, "Creating WhatsApp client");
   const client = new WaClient({ store, sessionId: authSessionId }, new ConsoleLogger(
     process.env.LOG_LEVEL === "debug" ? "debug" : "info",
   ));
   client.on("auth_qr", ({ qr }) => {
     latestQr = qr;
     connectionStatus = "pairing";
-    console.log(`Scan this QR code to connect WhatsApp:\n${qr}`);
+    logger.info({ qrLength: qr.length, status: connectionStatus }, "WhatsApp pairing QR generated");
   });
 
   client.on("auth_paired", ({ credentials }) => {
     latestQr = undefined;
     pairedNumber = credentials.meJid;
     connectionStatus = "open";
-    console.log(`WhatsApp paired as ${credentials.meJid}`);
+    logger.info({ pairedNumber: credentials.meJid, status: connectionStatus }, "WhatsApp paired");
   });
 
   client.on("connection", ({ status }) => {
     connectionStatus = status;
     if (status === "open") latestQr = undefined;
-    console.log(`WhatsApp connection status: ${status}`);
+    logger.info({ status, reconnectEnabled }, "WhatsApp connection status changed");
     if (status === "close" && reconnectEnabled) {
       setTimeout(() => void zapo.connect(), 5_000);
     }
@@ -82,6 +98,11 @@ const normalizePhone = (phone: string): string => {
   return `${digits}@s.whatsapp.net`;
 };
 
+const redactPhone = (phone: string): string => {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length > 4 ? `${digits.slice(0, 4)}***${digits.slice(-3)}` : "***";
+};
+
 /**
  * Converts a WebSocket notification event into a WhatsApp message.
  *
@@ -95,6 +116,7 @@ const sendEvent = async (event: Record<string, unknown>): Promise<void> => {
   const recipientValue = event.recipientPhone || (["invoice_created", "invoice_due"].includes(String(event.type)) ? event.customerPhone : event.ownerPhone);
   const recipient = typeof recipientValue === "string" ? recipientValue.trim() : "";
   if (!recipient) throw new Error("Notification event has no recipient phone number");
+  const recipientJid = normalizePhone(recipient);
 
   const message = typeof event.message === "string" && event.message
     ? event.message
@@ -127,7 +149,15 @@ const sendEvent = async (event: Record<string, unknown>): Promise<void> => {
         `Metode: ${event.paymentMethod}`,
       ].join("\n");
 
-  await zapo.message.send(normalizePhone(recipient), message);
+  logger.info({
+    eventType: event.type,
+    invoiceNumber: event.invoiceNumber,
+    recipient: redactPhone(recipient),
+    connectionStatus,
+    messageLength: message.length,
+  }, "Sending automatic WhatsApp notification");
+  await zapo.message.send(recipientJid, message);
+  logger.info({ eventType: event.type, recipient: redactPhone(recipient) }, "Automatic WhatsApp notification sent");
 };
 
 /**
@@ -141,10 +171,21 @@ const sendTestMessage = async (body: string): Promise<void> => {
   const payload = JSON.parse(body) as { recipient?: string; message?: string };
   if (!payload.recipient?.trim() || !payload.message?.trim()) throw new Error("Test notification requires recipient and message");
   if (connectionStatus !== "open") throw new Error("WhatsApp is not connected");
+  logger.info({ recipient: redactPhone(payload.recipient), messageLength: payload.message.length }, "Sending test WhatsApp notification");
   await zapo.message.send(normalizePhone(payload.recipient), payload.message);
+  logger.info({ recipient: redactPhone(payload.recipient) }, "Test WhatsApp notification sent");
 };
 
 const server = createServer((request, response) => {
+  const startedAt = process.hrtime.bigint();
+  response.on("finish", () => {
+    logger.info({
+      method: request.method,
+      url: request.url,
+      statusCode: response.statusCode,
+      durationMs: Number((Number(process.hrtime.bigint() - startedAt) / 1_000_000).toFixed(2)),
+    }, "Notification HTTP request completed");
+  });
   if (request.url === "/event" && request.method === "POST") {
     let body = "";
     request.on("data", (chunk) => { body += chunk.toString(); });
@@ -153,6 +194,7 @@ const server = createServer((request, response) => {
       try {
         event = JSON.parse(body) as Record<string, unknown>;
       } catch {
+        logger.warn({ endpoint: "/event" }, "Rejected invalid notification event JSON");
         response.writeHead(400, { "content-type": "application/json" });
         response.end(JSON.stringify({ message: "Invalid notification event JSON" }));
         return;
@@ -163,7 +205,7 @@ const server = createServer((request, response) => {
           response.end(JSON.stringify({ sent: true }));
         })
         .catch((error: unknown) => {
-          console.error("Failed to deliver HTTP notification event", error);
+          logger.error({ err: error, endpoint: "/event" }, "Failed to deliver HTTP notification event");
           response.writeHead(503, { "content-type": "application/json" });
           response.end(JSON.stringify({ message: error instanceof Error ? error.message : "Notification event failed" }));
         });
@@ -192,9 +234,10 @@ const server = createServer((request, response) => {
     return;
   }
   if (request.url === "/pair" && request.method === "POST") {
+    logger.info("WhatsApp pairing requested");
     reconnectEnabled = false;
     void zapo.logout()
-      .catch((error: unknown) => console.error("Failed to clear WhatsApp session before pairing", error))
+      .catch((error: unknown) => logger.error({ err: error }, "Failed to clear WhatsApp session before pairing"))
       .finally(() => {
         latestQr = undefined;
         pairedNumber = undefined;
@@ -208,12 +251,13 @@ const server = createServer((request, response) => {
     return;
   }
   if (request.url === "/disconnect" && request.method === "POST") {
+    logger.info("WhatsApp disconnect requested");
     reconnectEnabled = false;
     void zapo.disconnect()
       .then(() => {
         connectionStatus = "disconnected";
       })
-      .catch((error: unknown) => console.error("Failed to disconnect WhatsApp", error));
+      .catch((error: unknown) => logger.error({ err: error }, "Failed to disconnect WhatsApp"));
     response.writeHead(202, { "content-type": "application/json" });
     response.end(JSON.stringify({ status: "disconnecting" }));
     return;
@@ -230,18 +274,21 @@ const server = createServer((request, response) => {
 
 const websocket = new WebSocketServer({ server });
 websocket.on("connection", (socket) => {
+  logger.info("Backend notification WebSocket connected");
   socket.on("message", async (raw) => {
     try {
       const event = JSON.parse(raw.toString()) as Record<string, unknown>;
-      console.log(`Delivering ${String(event.type)} notification to ${String(event.recipientPhone || event.customerPhone || event.ownerPhone || "unknown")}`);
+      logger.info({ eventType: event.type }, "WebSocket notification event received");
       await sendEvent(event);
     } catch (error) {
-      console.error("Failed to process notification event", error);
+      logger.error({ err: error }, "Failed to process WebSocket notification event");
     }
   });
+  socket.on("close", () => logger.info("Backend notification WebSocket disconnected"));
+  socket.on("error", (error) => logger.error({ err: error }, "Backend notification WebSocket error"));
 });
 
 server.listen(port, "0.0.0.0", () => {
-  console.log(`Notification service is running on port ${port}`);
+  logger.info({ port, storePath: zapoStorePath, sessionId: authSessionId }, "Notification service started");
   void zapo.connect();
 });
