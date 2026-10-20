@@ -43,6 +43,14 @@ customerDashboard.get("/:customerId", async (req, res) => {
   return res.json({ customer, room, invoices, transactions });
 });
 
+customerDashboard.put("/:customerId/notification/preferences", async (req, res) => {
+  if (req.user?.role !== "customer" || req.user.id !== req.params.customerId) return res.status(403).json({ message: "Cannot update this notification setup" });
+  if (typeof req.body?.enabled !== "boolean") return res.status(400).json({ message: "Status notifikasi tidak valid" });
+  const customer = await Customer.findOneAndUpdate({ customerId: req.params.customerId }, { notificationEnabled: req.body.enabled }, { new: true }).select("notificationEnabled").lean();
+  if (!customer) return res.status(404).json({ message: "Customer not found" });
+  return res.json({ notificationEnabled: customer.notificationEnabled });
+});
+
 customerDashboard.post("/:customerId/invoices/extend", async (req, res) => {
   if (req.user?.role !== "customer" || req.user.id !== req.params.customerId) {
     return res.status(403).json({ message: "Cannot request this extension" });
@@ -86,7 +94,7 @@ customerDashboard.post("/:customerId/invoices/extend", async (req, res) => {
   const customer = await Customer.findOne({ customerId: req.params.customerId }).lean();
   const owner = room.ownerId ? await Owner.findOne({ ownerId: room.ownerId }).lean() : undefined;
   const ownerPhone = owner?.notificationPhone || owner?.phoneNumber;
-  if (customer && owner && ownerPhone) {
+  if (customer && owner && owner.notificationEnabled !== false && ownerPhone) {
     const message = await renderNotificationTemplate("extension_requested", {
       customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
       room_name: room.name,
@@ -173,7 +181,7 @@ customerDashboard.post("/:customerId/invoices/combined", async (req, res) => {
   const customer = await Customer.findOne({ customerId: req.params.customerId }).lean();
   const owner = room.ownerId ? await Owner.findOne({ ownerId: room.ownerId }).lean() : undefined;
   const ownerPhone = owner?.notificationPhone || owner?.phoneNumber;
-  if (customer && owner && ownerPhone) {
+  if (customer && owner && owner.notificationEnabled !== false && ownerPhone) {
     const message = await renderNotificationTemplate("extension_requested", {
       customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
       room_name: room.name,

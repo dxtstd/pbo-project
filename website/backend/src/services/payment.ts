@@ -34,8 +34,9 @@ export class PaymentService {
       Customer.findOne({ customerId: invoice.customerId }).select("firstname lastname").lean(),
       Room.findOne({ roomId: invoice.roomId }).select("ownerId").lean(),
     ]);
-    const owner = room?.ownerId ? await Owner.findOne({ ownerId: room.ownerId }).select("firstname lastname phoneNumber notificationPhone").lean() : undefined;
-    if (customer && owner) {
+    const owner = room?.ownerId ? await Owner.findOne({ ownerId: room.ownerId }).select("firstname lastname phoneNumber notificationPhone notificationEnabled").lean() : undefined;
+    const ownerPhone = owner?.notificationPhone || owner?.phoneNumber;
+    if (customer && owner && owner.notificationEnabled !== false && ownerPhone) {
       const message = await renderNotificationTemplate("cash_requested", {
         customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
         invoice_number: invoice.invoiceNumber,
@@ -47,7 +48,7 @@ export class PaymentService {
         invoiceNumber: invoice.invoiceNumber,
         customerName: `${customer.firstname} ${customer.lastname}`.trim(),
         ownerName: `${owner.firstname} ${owner.lastname}`.trim(),
-        ownerPhone: owner.notificationPhone || owner.phoneNumber,
+        ownerPhone,
         amount: invoice.amount,
         expiresAt: transaction.expiresAt!.toISOString(),
         message,
@@ -143,7 +144,7 @@ export class PaymentService {
       payment_method: transaction.paymentMethod,
       dashboard_link: "/dashboard/owner",
     });
-    publishPaymentReceived({
+    if (owner.notificationEnabled !== false) publishPaymentReceived({
       type: "payment_received",
       invoiceNumber: transaction.invoiceNumber,
       customerName: `${customer.firstname} ${customer.lastname}`.trim(),
@@ -154,6 +155,27 @@ export class PaymentService {
       paymentDate: transaction.paymentDate.toISOString(),
       message,
     });
+    if (customer.notificationEnabled !== false && customer.phoneNumber) {
+      const customerMessage = await renderNotificationTemplate("payment_received", {
+        customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
+        invoice_number: transaction.invoiceNumber,
+        payment: `Rp${transaction.totalAmount.toLocaleString("id-ID")}`,
+        payment_method: transaction.paymentMethod,
+        dashboard_link: "/dashboard/customer/payment",
+      }, "customer");
+      publishPaymentReceived({
+        type: "payment_received",
+        invoiceNumber: transaction.invoiceNumber,
+        customerName: `${customer.firstname} ${customer.lastname}`.trim(),
+        ownerName: `${owner.firstname} ${owner.lastname}`.trim(),
+        ownerPhone,
+        recipientPhone: customer.phoneNumber,
+        amount: transaction.totalAmount,
+        paymentMethod: transaction.paymentMethod,
+        paymentDate: transaction.paymentDate.toISOString(),
+        message: customerMessage,
+      });
+    }
   }
 
   public async cancelCash(transactionId: string, customerId: string) {

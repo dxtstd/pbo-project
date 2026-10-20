@@ -1,5 +1,6 @@
 import WebSocket from "ws";
 import NotificationTemplate from "../models/notificationTemplate";
+import SiteContent from "../models/siteContent";
 
 export type NotificationTemplateKey = "invoice_created" | "invoice_due" | "cash_requested" | "payment_received" | "extension_requested";
 export type NotificationAudience = "owner" | "customer";
@@ -10,7 +11,7 @@ export const defaultNotificationTemplates: Record<NotificationAudience, Record<N
     invoice_created: { header: "INVOICE BARU", content: "Halo %customer_name%,\nInvoice %invoice_number% sebesar %payment% telah dibuat.\nJatuh tempo: %due_date%.\nBuka %dashboard_link% untuk melanjutkan pembayaran." },
     invoice_due: { header: "PENGINGAT TAGIHAN", content: "Halo %customer_name%,\nInvoice %invoice_number% sebesar %payment% akan jatuh tempo pada %due_date%.\nPengingat H-%days_before_due%." },
     cash_requested: { header: "", content: "" },
-    payment_received: { header: "", content: "" },
+    payment_received: { header: "PEMBAYARAN BERHASIL", content: "Pembayaran invoice %invoice_number% sebesar %payment% telah berhasil diterima.\nMetode pembayaran: %payment_method%." },
     extension_requested: { header: "", content: "" },
   },
   owner: {
@@ -31,8 +32,10 @@ export const renderNotificationTemplate = async (event: NotificationTemplateKey,
   const template = await NotificationTemplate.findOne({ ownerId: "__global__", audience, event, active: true }).sort({ updatedAt: -1 }).lean();
   const content = template?.content || fallback.content;
   const header = template?.header || fallback.header;
-  const rendered = content.replace(/%([a-z_]+)%/g, (_match, key: string) => String(values[key] ?? ""));
-  return header ? `${header}\n\n${rendered}` : rendered;
+  const business = await SiteContent.findOne({ key: "landing" }).select("siteName").lean();
+  const renderedHeader = header.replace(/%([a-z_]+)%/g, (_match, key: string) => String(values[key] ?? (key === "name_business" ? business?.siteName : "")));
+  const rendered = content.replace(/%([a-z_]+)%/g, (_match, key: string) => String(values[key] ?? (key === "name_business" ? business?.siteName : "")));
+  return `${values.name_business || business?.siteName || "Kost Lorem Ipsum"}\n=============\n${renderedHeader}\n\n${rendered}`;
 };
 
 export type NotificationEvent =
@@ -44,6 +47,7 @@ export type NotificationEvent =
       amount: number;
       dueDate: string;
       message?: string;
+      recipientPhone?: string;
     }
   | {
       type: "invoice_due";
@@ -77,6 +81,7 @@ export type NotificationEvent =
       paymentMethod: string;
       paymentDate: string;
       message?: string;
+      recipientPhone?: string;
     }
   | {
       type: "extension_requested";

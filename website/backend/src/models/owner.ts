@@ -8,6 +8,7 @@
     email: string;
     phoneNumber: string;
     notificationPhone?: string;
+    notificationEnabled: boolean;
     password: string;
   }
 
@@ -19,6 +20,7 @@
     email: { type: String, required: true, unique: true, index: true },
     phoneNumber: { type: String, required: true },
     notificationPhone: { type: String, required: false },
+    notificationEnabled: { type: Boolean, default: true },
     password: { type: String, required: true },
   }, {
     timestamps: true,

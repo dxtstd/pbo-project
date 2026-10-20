@@ -28,6 +28,8 @@ export function AdminDashboard() {
   const [recipients, setRecipients] = useState<RecipientData>({ status: {}, owners: [], customers: [] });
   const [testRecipient, setTestRecipient] = useState("");
   const [testMessage, setTestMessage] = useState("Halo dari Kost Lorem Ipsum. Ini adalah pesan testing notifikasi WhatsApp.");
+  const [testEvent, setTestEvent] = useState("invoice_due");
+  const [testAudience, setTestAudience] = useState<"owner" | "customer">("customer");
   const [notificationTemplates, setNotificationTemplates] = useState<NotificationTemplate[]>([]);
 
   const load = useCallback(async () => {
@@ -95,6 +97,15 @@ export function AdminDashboard() {
     const result = await response.json().catch(() => ({})) as { message?: string };
     setMessage(response.ok ? "Notifikasi testing berhasil dikirim." : result.message || "Notifikasi testing gagal dikirim.");
   };
+  const sendEventTest = async () => {
+    const audience = ["invoice_created", "invoice_due"].includes(testEvent) ? "customer" : testEvent === "payment_received" ? testAudience : "owner";
+    const response = await apiFetch(`${API_URL}/admin/notification/test-event`, {
+      method: "POST", headers: { ...authHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ recipient: testRecipient, event: testEvent, audience }),
+    });
+    const result = await response.json().catch(() => ({})) as { message?: string };
+    setMessage(response.ok ? "Simulasi notifikasi berhasil dikirim." : result.message || "Simulasi notifikasi gagal dikirim.");
+  };
 
   const saveNotificationTemplates = async () => {
     const response = await apiFetch(`${API_URL}/admin/notification/templates`, {
@@ -129,14 +140,15 @@ export function AdminDashboard() {
           <div className="mt-4 grid gap-3">
             <label className="text-sm font-semibold">Penerima<select value={testRecipient} onChange={(event) => setTestRecipient(event.target.value)} className="mt-1 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2"><option value="">Pilih nomor customer atau owner</option><optgroup label="Customer">{recipients.customers.map((recipient) => <option key={`customer-${recipient.id}`} value={recipient.phone}>{recipient.label} · {recipient.phone}</option>)}</optgroup><optgroup label="Owner">{recipients.owners.map((recipient) => <option key={`owner-${recipient.id}`} value={recipient.phone}>{recipient.label} · {recipient.phone}</option>)}</optgroup></select></label>
             <label className="text-sm font-semibold">Pesan<textarea rows={4} value={testMessage} onChange={(event) => setTestMessage(event.target.value)} className="mt-1 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2" /></label>
-            <button onClick={() => void sendNotificationTest()} disabled={!testRecipient || !testMessage.trim()} className="rounded-lg bg-[#694536] px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Kirim pesan testing</button>
+            <button onClick={() => void sendNotificationTest()} disabled={!testRecipient || !testMessage.trim()} className="rounded-lg bg-[#694536] px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Kirim pesan custom</button>
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]"><select value={testEvent} onChange={(event) => setTestEvent(event.target.value)} className="rounded-lg border border-[#caa897] bg-white px-3 py-2"><option value="invoice_created">Test invoice baru</option><option value="invoice_due">Test H-7 / due date</option><option value="cash_requested">Test request cash</option><option value="payment_received">Test transaksi berhasil</option><option value="extension_requested">Test request perpanjangan</option></select>{testEvent === "payment_received" && <select value={testAudience} onChange={(event) => setTestAudience(event.target.value as "owner" | "customer")} className="rounded-lg border border-[#caa897] bg-white px-3 py-2"><option value="customer">Customer</option><option value="owner">Owner</option></select>}<button onClick={() => void sendEventTest()} disabled={!testRecipient} className="rounded-lg border border-[#694536] px-4 py-2 font-semibold text-[#694536] disabled:opacity-50">Kirim simulasi event</button></div>
           </div>
         </section>
 
         <section className="mt-6 rounded-2xl border border-[#d7b9a9] bg-[#fffaf5] p-5 sm:p-7">
           <h2 className="text-xl font-bold">Template pesan otomatis</h2>
           <p className="mt-1 text-sm text-[#765e52]">Atur pesan untuk invoice pertama, H-7/jatuh tempo, cash, pembayaran berhasil, dan permintaan perpanjangan kamar.</p>
-          <p className="mt-2 rounded-lg bg-[#f8eee7] p-3 text-xs text-[#765e52]">Placeholder: %customer_name% %owner_name% %payment% %invoice_number% %due_date% %days_before_due% %expires_at% %payment_method% %room_name% %months% %dashboard_link%</p>
+          <p className="mt-2 rounded-lg bg-[#f8eee7] p-3 text-xs text-[#765e52]">Format pesan: %name_business%<br />=============<br />%header%<br /><br />%message%<br /><br />Placeholder isi: %customer_name% %owner_name% %payment% %invoice_number% %due_date% %days_before_due% %expires_at% %payment_method% %room_name% %months% %dashboard_link%</p>
           <div className="mt-4 grid gap-5 md:grid-cols-2">{(["customer", "owner"] as const).map((audience) => <div key={audience} className="rounded-xl border border-[#d7b9a9] p-4"><h3 className="text-lg font-bold">{audience === "customer" ? "Template Customer" : "Template Owner"}</h3><div className="mt-3 grid gap-4">{notificationTemplates.filter((template) => template.audience === audience).map((template) => <div key={`${template.audience}-${template.event}`}><label className="text-sm font-semibold">{({ invoice_created: "Invoice pertama", invoice_due: "H-7 / jatuh tempo", cash_requested: "Request cash", payment_received: "Transaksi berhasil", extension_requested: "Request perpanjangan kamar" } as Record<string, string>)[template.event] || template.event}<input value={template.header} placeholder="Header pesan" onChange={(event) => setNotificationTemplates(notificationTemplates.map((item) => item.audience === template.audience && item.event === template.event ? { ...item, header: event.target.value } : item))} className="mt-1 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2 font-normal" /><textarea rows={4} value={template.content} onChange={(event) => setNotificationTemplates(notificationTemplates.map((item) => item.audience === template.audience && item.event === template.event ? { ...item, content: event.target.value } : item))} className="mt-1 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2 font-normal" /></label></div>)}</div></div>)}</div>
           <button onClick={() => void saveNotificationTemplates()} className="mt-4 rounded-lg bg-[#694536] px-4 py-2 font-semibold text-white">Simpan template notifikasi</button>
         </section>

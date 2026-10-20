@@ -17,7 +17,7 @@ type Invoice = {
 };
 
 type CustomerDashboard = {
-  customer: { firstname: string; lastname: string };
+  customer: { firstname: string; lastname: string; notificationEnabled?: boolean };
   room?: { name: string; price: number; rentalStartDate?: string };
   invoices: Invoice[];
 };
@@ -68,6 +68,16 @@ export function CustomerDashboard() {
     if (response.ok && result.redirectUrl) window.location.assign(result.redirectUrl);
     else setNotice("Pembayaran online belum dapat dibuat.");
   };
+  const setNotificationsEnabled = async (enabled: boolean) => {
+    if (!customerId) return;
+    const response = await apiFetch(`${API_URL}/dashboard/customer/${customerId}/notification/preferences`, {
+      method: "PUT", headers: { ...authHeaders(), "content-type": "application/json" }, body: JSON.stringify({ enabled }),
+    });
+    if (response.ok) {
+      setData((current) => current ? { ...current, customer: { ...current.customer, notificationEnabled: enabled } } : current);
+      setNotice(enabled ? "Notifikasi customer diaktifkan." : "Notifikasi customer dinonaktifkan.");
+    } else setNotice("Pengaturan notifikasi gagal disimpan.");
+  };
   const downloadCustomerInvoice = async (invoiceNumber: string) => {
     if (!customerId) return;
     try {
@@ -81,7 +91,7 @@ export function CustomerDashboard() {
       <div className="mx-auto max-w-6xl">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div><p className="text-sm text-[#765e52]">Dashboard Penghuni</p><h1 className="font-serif text-3xl font-bold">Halo, {data.customer.firstname}</h1></div>
-          <button onClick={() => { logout(); navigate("/", { replace: true }); }} className="rounded-lg border border-[#caa897] px-4 py-2 text-sm">Keluar</button>
+          <div className="flex items-center gap-2"><button onClick={() => void setNotificationsEnabled(data.customer.notificationEnabled === false)} className="rounded-lg border border-[#caa897] px-3 py-2 text-xs">{data.customer.notificationEnabled === false ? "Aktifkan notif" : "Matikan notif"}</button><button onClick={() => { logout(); navigate("/", { replace: true }); }} className="rounded-lg border border-[#caa897] px-4 py-2 text-sm">Keluar</button></div>
         </header>
         <section className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
           <div className="rounded-2xl border border-[#d1b4a4] bg-[#fffaf5] p-5 shadow-sm sm:p-7">

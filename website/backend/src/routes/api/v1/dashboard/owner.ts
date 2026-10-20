@@ -201,12 +201,12 @@ ownerDashboard.delete("/:ownerId/customers/:customerId", async (req, res) => {
  */
 ownerDashboard.get("/:ownerId/notification", async (req, res) => {
   if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot access this notification setup" });
-  const owner = await Owner.findOne({ ownerId: req.params.ownerId }).select("phoneNumber notificationPhone").lean();
+  const owner = await Owner.findOne({ ownerId: req.params.ownerId }).select("phoneNumber notificationPhone notificationEnabled").lean();
   if (!owner) return res.status(404).json({ message: "Owner not found" });
   try {
     const response = await fetch(`${config.notificationHttpUrl}/status`);
     if (!response.ok) return res.status(502).json({ message: "Notification service unavailable" });
-    return res.json({ ...(await response.json()), ownerPhone: owner.phoneNumber, notificationPhone: owner.notificationPhone || owner.phoneNumber });
+    return res.json({ ...(await response.json()), ownerPhone: owner.phoneNumber, notificationPhone: owner.notificationPhone || owner.phoneNumber, notificationEnabled: owner.notificationEnabled !== false });
   } catch {
     return res.status(503).json({ message: "Notification service unavailable" });
   }
@@ -263,6 +263,15 @@ ownerDashboard.put("/:ownerId/notification/phone", async (req, res) => {
   ).select("phoneNumber notificationPhone").lean();
   if (!owner) return res.status(404).json({ message: "Owner not found" });
   return res.json({ notificationPhone: owner.notificationPhone });
+});
+
+ownerDashboard.put("/:ownerId/notification/preferences", async (req, res) => {
+  if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot update this notification setup" });
+  const enabled = req.body?.enabled;
+  if (typeof enabled !== "boolean") return res.status(400).json({ message: "Status notifikasi tidak valid" });
+  const owner = await Owner.findOneAndUpdate({ ownerId: req.params.ownerId }, { notificationEnabled: enabled }, { new: true }).select("notificationEnabled").lean();
+  if (!owner) return res.status(404).json({ message: "Owner not found" });
+  return res.json({ notificationEnabled: owner.notificationEnabled });
 });
 
 /**

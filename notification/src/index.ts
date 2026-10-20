@@ -77,7 +77,8 @@ zapo = createClient();
  * @returns WhatsApp JID in the form `<digits>@s.whatsapp.net`.
  */
 const normalizePhone = (phone: string): string => {
-  const digits = phone.replace(/\D/g, "");
+  const rawDigits = phone.replace(/\D/g, "");
+  const digits = rawDigits.startsWith("0") ? `62${rawDigits.slice(1)}` : rawDigits;
   return `${digits}@s.whatsapp.net`;
 };
 
@@ -91,7 +92,7 @@ const normalizePhone = (phone: string): string => {
 const sendEvent = async (event: Record<string, unknown>): Promise<void> => {
   if (!["invoice_created", "invoice_due", "cash_requested", "payment_received", "extension_requested"].includes(String(event.type))) return;
 
-  const recipientValue = ["invoice_created", "invoice_due"].includes(String(event.type)) ? event.customerPhone : event.ownerPhone;
+  const recipientValue = event.recipientPhone || (["invoice_created", "invoice_due"].includes(String(event.type)) ? event.customerPhone : event.ownerPhone);
   const recipient = typeof recipientValue === "string" ? recipientValue.trim() : "";
   if (!recipient) throw new Error("Notification event has no recipient phone number");
 

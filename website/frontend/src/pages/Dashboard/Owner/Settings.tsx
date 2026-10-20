@@ -6,7 +6,7 @@ import type { OwnerData } from "./types";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
 
 type Context = { data: OwnerData; refresh: () => Promise<void>; setMessage: (message: string) => void };
-type NotificationStatus = { status: string; qr?: string; pairedNumber?: string; ownerPhone?: string; notificationPhone?: string };
+type NotificationStatus = { status: string; qr?: string; pairedNumber?: string; ownerPhone?: string; notificationPhone?: string; notificationEnabled?: boolean };
 
 export function OwnerSettings() {
   const { setMessage } = useOutletContext<Context>();
@@ -113,13 +113,24 @@ export function OwnerSettings() {
     setMessage(response.ok ? `Notifikasi tes berhasil dikirim ke ${phone}.` : result.message || "Notifikasi tes gagal dikirim. Pastikan WhatsApp sudah terhubung.");
     setLoading(false);
   };
+  const setNotificationsEnabled = async (enabled: boolean) => {
+    if (!ownerId) return;
+    const response = await apiFetch(`${API_URL}/dashboard/owner/${ownerId}/notification/preferences`, {
+      method: "PUT", headers: { ...authHeaders(), "content-type": "application/json" }, body: JSON.stringify({ enabled }),
+    });
+    if (response.ok) {
+      setStatus((current) => current ? { ...current, notificationEnabled: enabled } : current);
+      setMessage(enabled ? "Notifikasi owner diaktifkan." : "Notifikasi owner dinonaktifkan.");
+    } else setMessage("Pengaturan notifikasi gagal disimpan.");
+  };
 
   return <>
     <div><h2 className="text-2xl font-bold">Pengaturan notifikasi</h2><p className="text-sm text-[#765e52]">Hubungkan WhatsApp untuk menerima pengingat tagihan dan notifikasi pembayaran.</p></div>
     <section className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)]">
       <div className="rounded-2xl border border-[#d7b9a9] bg-[#fffaf5] p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-lg font-bold">Pairing WhatsApp</h3><p className="mt-1 text-sm text-[#765e52]">Mulai pairing dari sini, lalu scan QR menggunakan WhatsApp.</p></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${status?.status === "open" ? "bg-[#d9ead7] text-[#315c32]" : "bg-[#ead0c2] text-[#694536]"}`}>{status?.status === "open" ? "Terhubung" : status?.status || "Memeriksa..."}</span></div>
-        <label className="mt-6 block text-sm font-semibold">Nomor owner untuk notifikasi<select value={notificationPhone} onChange={(event) => setNotificationPhone(event.target.value)} className="mt-2 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2"><option value={status?.ownerPhone || ""}>{status?.ownerPhone || "Nomor owner belum tersedia"}</option><option value="">Pilih nomor lain</option></select><span className="mt-1 block text-xs font-normal text-[#765e52]">Nomor ini menerima pengingat invoice dan notifikasi pembayaran.</span></label>
+        <div className="mt-6 flex items-center justify-between rounded-lg bg-[#f8eee7] p-3"><div><p className="text-sm font-semibold">Notifikasi owner</p><p className="text-xs text-[#765e52]">Terima cash request, transaksi berhasil, dan perpanjangan kamar.</p></div><button type="button" onClick={() => void setNotificationsEnabled(status?.notificationEnabled === false)} className={`rounded-full px-3 py-1 text-xs font-semibold ${status?.notificationEnabled === false ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>{status?.notificationEnabled === false ? "Nonaktif" : "Aktif"}</button></div>
+        <label className="mt-4 block text-sm font-semibold">Nomor owner untuk notifikasi<select value={notificationPhone} onChange={(event) => setNotificationPhone(event.target.value)} className="mt-2 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2"><option value={status?.ownerPhone || ""}>{status?.ownerPhone || "Nomor owner belum tersedia"}</option><option value="">Pilih nomor lain</option></select><span className="mt-1 block text-xs font-normal text-[#765e52]">Nomor ini menerima pengingat invoice dan notifikasi pembayaran.</span></label>
         <div className="mt-2 flex gap-2"><input type="text" inputMode="tel" value={notificationPhone} onChange={(event) => setNotificationPhone(event.target.value)} placeholder="628123456789" className="min-w-0 flex-1 rounded-lg border border-[#caa897] bg-white px-3 py-2 outline-none focus:border-[#694536]" /><button type="button" onClick={() => void saveNotificationPhone()} className="rounded-lg border border-[#caa897] px-3 py-2 text-sm font-semibold">Simpan nomor</button></div>
         <label className="mt-4 block text-sm font-semibold">Nomor tujuan notifikasi tes<input type="text" inputMode="tel" value={testPhone} onChange={(event) => setTestPhone(event.target.value)} placeholder="628123456789" className="mt-2 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2 outline-none focus:border-[#694536]" /><span className="mt-1 block text-xs font-normal text-[#765e52]">Gunakan kode negara, contoh: 628123456789.</span></label>
         <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => void startPairing()} disabled={loading} className="rounded-lg bg-[#694536] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{loading ? "Menghubungkan..." : "Pairing ulang"}</button><button type="button" onClick={() => setShowDisconnectConfirm(true)} disabled={loading || status?.status !== "open"} className="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50">Disconnect</button><button type="button" onClick={() => void sendTestNotification("cash_request")} disabled={loading || status?.status !== "open" || !(testPhone || notificationPhone).trim()} className="rounded-lg border border-[#caa897] px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50">Tes request cash</button><button type="button" onClick={() => void sendTestNotification("transaction_success")} disabled={loading || status?.status !== "open" || !(testPhone || notificationPhone).trim()} className="rounded-lg border border-[#caa897] px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50">Tes transaksi berhasil</button></div>

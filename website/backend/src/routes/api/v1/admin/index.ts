@@ -11,7 +11,7 @@ import { requireAuth, isAdmin } from "../../../../middlewares/auth";
 import { isValidPhoneNumber, normalizePhoneNumber } from "../../../../utils/phone";
 import { nextOwnerId } from "../../../../utils/identifiers";
 import { config } from "../../../../config/env";
-import { defaultNotificationTemplates, type NotificationAudience, type NotificationTemplateKey } from "../../../../services/notification";
+import { defaultNotificationTemplates, renderNotificationTemplate, type NotificationAudience, type NotificationTemplateKey } from "../../../../services/notification";
 
 const admin = Router();
 const RESET_CONFIRMATION = "RESET-ALL";
@@ -62,7 +62,7 @@ admin.put("/site-content", async (req, res) => {
 admin.get("/notification/templates", async (_req, res) => {
   const saved = await NotificationTemplate.find({ ownerId: "__global__" }).lean();
   const eventsByAudience: Record<NotificationAudience, NotificationTemplateKey[]> = {
-    customer: ["invoice_created", "invoice_due"],
+    customer: ["invoice_created", "invoice_due", "payment_received"],
     owner: ["cash_requested", "payment_received", "extension_requested"],
   };
   const templates = (["customer", "owner"] as NotificationAudience[]).flatMap((audience) =>
@@ -79,7 +79,7 @@ admin.put("/notification/templates", async (req, res) => {
   const templates = req.body?.templates;
   if (!templates || typeof templates !== "object") return res.status(400).json({ message: "Format template tidak valid" });
   const eventsByAudience: Record<NotificationAudience, NotificationTemplateKey[]> = {
-    customer: ["invoice_created", "invoice_due"],
+    customer: ["invoice_created", "invoice_due", "payment_received"],
     owner: ["cash_requested", "payment_received", "extension_requested"],
   };
   for (const audience of ["customer", "owner"] as NotificationAudience[]) {
@@ -136,6 +136,43 @@ admin.post("/notification/test", async (req, res) => {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ recipient: phone, message }),
+    });
+
+    admin.post("/notification/test-event", async (req, res) => {
+      const recipient = typeof req.body?.recipient === "string" ? req.body.recipient.trim() : "";
+      const event = req.body?.event as NotificationTemplateKey;
+      const audience = req.body?.audience as NotificationAudience;
+      if (!recipient || !Object.keys(defaultNotificationTemplates.customer).includes(event) || !["owner", "customer"].includes(audience)) {
+        return res.status(400).json({ message: "Event dan penerima testing tidak valid" });
+      }
+      const phone = normalizePhoneNumber(recipient);
+      if (!isValidPhoneNumber(phone)) return res.status(400).json({ message: "Nomor WhatsApp tidak valid" });
+      const message = await renderNotificationTemplate(event, {
+        customer_name: "Customer Test",
+        owner_name: "Owner Test",
+        payment: "Rp500.000",
+        invoice_number: "INV-TEST",
+        due_date: new Date().toLocaleDateString("id-ID"),
+        days_before_due: 7,
+        expires_at: new Date(Date.now() + 86400000).toLocaleString("id-ID"),
+        payment_method: "Cash",
+        room_name: "Kamar Test",
+        months: 1,
+        dashboard_link: audience === "owner" ? "/dashboard/owner" : "/dashboard/customer/payment",
+        name_business: "Kost Lorem Ipsum",
+      }, audience);
+      try {
+        const response = await fetch(`${config.notificationHttpUrl}/test`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ recipient: phone, message }),
+        });
+        const result = await response.json().catch(() => ({})) as { message?: string };
+        if (!response.ok) return res.status(502).json({ message: result.message || "Test event gagal dikirim" });
+        return res.json({ sent: true });
+      } catch {
+        return res.status(503).json({ message: "Notification service unavailable" });
+      }
     });
     const result = await response.json().catch(() => ({})) as { message?: string };
     if (!response.ok) return res.status(502).json({ message: result.message || "Test notification gagal dikirim" });

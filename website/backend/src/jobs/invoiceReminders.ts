@@ -38,7 +38,7 @@ export const sendInvoiceReminders = async (): Promise<void> => {
         ? await Owner.findOne({ ownerId: room.ownerId }).lean()
         : undefined;
 
-      if (!customer || !owner) {
+      if (!customer || !owner || customer.notificationEnabled === false || owner.notificationEnabled === false) {
         console.error(`Cannot notify invoice ${invoice.invoiceNumber}: customer or owner not found`);
         continue;
       }

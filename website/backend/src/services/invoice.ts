@@ -32,7 +32,7 @@ export const createInvoiceForPeriod = async (input: {
     throw new Error("Durasi invoice harus antara 1 sampai 12 bulan");
   }
   const [customer, room] = await Promise.all([
-    Customer.findOne({ customerId: input.customerId }).select("firstname lastname phoneNumber").lean(),
+    Customer.findOne({ customerId: input.customerId }).select("firstname lastname phoneNumber notificationEnabled").lean(),
     Room.findOne({ roomId: input.roomId }).select("name price ownerId").lean(),
   ]);
   if (!customer || !room) throw new Error("Customer atau kamar tidak ditemukan");
@@ -63,7 +63,7 @@ export const createInvoiceForPeriod = async (input: {
     periodEndDate: endDate,
     periodMonths: input.months,
   });
-  if (input.notifyCreated !== false && customer.phoneNumber) {
+  if (input.notifyCreated !== false && customer.notificationEnabled !== false && customer.phoneNumber) {
     const message = await renderNotificationTemplate("invoice_created", {
       customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
       invoice_number: invoice.invoiceNumber,
@@ -79,7 +79,7 @@ export const createInvoiceForPeriod = async (input: {
       dueDate: invoice.dueDate.toISOString().slice(0, 10),
       message,
     });
-  } else {
+  } else if (input.notifyCreated !== false) {
     console.error(`Cannot notify invoice ${invoice.invoiceNumber}: customer phone not found`);
   }
   return invoice;
