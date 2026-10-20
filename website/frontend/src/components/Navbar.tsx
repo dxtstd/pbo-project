@@ -79,7 +79,7 @@ export const Navbar = function(): React.ReactElement {
   return (
     <nav className="sticky top-0 z-50 flex items-center justify-between gap-4 bg-[#F5EBE6] px-4 py-4 shadow-sm sm:px-8 md:px-12 md:py-6">
       <div className="shrink-0 font-serif text-lg font-bold text-[#4A3B32] sm:text-xl">
-        Kost Camp M2
+        Kost Lorem Ipsum
       </div>
       <div className="flex items-center gap-3 text-sm font-medium text-[#4A3B32] sm:gap-5 md:gap-8 md:text-base">
 

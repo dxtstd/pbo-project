@@ -3,6 +3,7 @@ import Invoice from "../models/invoice";
 import Owner from "../models/owner";
 import Room from "../models/room";
 import { notificationBridge } from "../services/notification";
+import { createNextInvoice } from "../services/invoice";
 
 const reminderDays = [7, 0];
 const sentReminderKeys = new Set<string>();
@@ -18,11 +19,14 @@ export const sendInvoiceReminders = async (): Promise<void> => {
     nextDay.setDate(nextDay.getDate() + 1);
 
     const invoices = await Invoice.find({
-      status: "unpaid",
+      status: { $in: ["unpaid", "overdue"] },
       dueDate: { $gte: dueDate, $lt: nextDay },
     }).lean();
 
     for (const invoice of invoices) {
+      await createNextInvoice(invoice).catch((error) => {
+        console.error(`Failed to create next invoice for ${invoice.invoiceNumber}`, error);
+      });
       const reminderKey = `${invoice.invoiceNumber}:${daysBeforeDue}:${dueDate.toISOString().slice(0, 10)}`;
       if (sentReminderKeys.has(reminderKey)) continue;
 

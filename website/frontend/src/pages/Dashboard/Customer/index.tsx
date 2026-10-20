@@ -3,12 +3,16 @@ import { Link, useNavigate } from "react-router-dom";
 import { API_URL, authHeaders } from "../../../config";
 import { downloadInvoicePdf } from "../../../utils/invoiceGenerator";
 import { Toast } from "../../../components/Toast";
+import { useAuthStore } from "../../../stores/auth";
 
 type Invoice = {
   invoiceNumber: string;
   amount: number;
   dueDate: string;
-  status: "paid" | "unpaid" | "overdue";
+  status: "paid" | "unpaid" | "overdue" | "cancelled";
+  periodStartDate?: string;
+  periodEndDate?: string;
+  periodMonths?: number;
 };
 
 type CustomerDashboard = {
@@ -21,6 +25,7 @@ const money = (value: number) => `Rp. ${value.toLocaleString("id-ID")}`;
 
 export function CustomerDashboard() {
   const navigate = useNavigate();
+  const logout = useAuthStore((state) => state.logout);
   const [data, setData] = useState<CustomerDashboard>();
   const [notice, setNotice] = useState("");
   const customerId = localStorage.getItem("userId");
@@ -34,7 +39,8 @@ export function CustomerDashboard() {
   }, [customerId, navigate]);
 
   if (!data) return <main className="min-h-screen bg-[#efe2d6] p-8">Memuat dashboard...</main>;
-  const invoice = data.invoices.find((item) => item.status !== "paid") || data.invoices[0];
+  const activeInvoices = data.invoices.filter((item) => item.status === "unpaid" || item.status === "overdue");
+  const invoice = activeInvoices[0];
   const submitCash = async () => {
     if (!invoice) return;
     const response = await fetch(`${API_URL}/payment/cash`, {
@@ -64,39 +70,25 @@ export function CustomerDashboard() {
       setNotice(error instanceof Error ? error.message : "Invoice PDF gagal diunduh.");
     }
   };
-  const sendTestNotification = async (scenario: "due_date" | "h7" | "payment_success") => {
-    if (!customerId) return;
-    const response = await fetch(`${API_URL}/dashboard/customer/${customerId}/notification/test`, {
-      method: "POST",
-      headers: { ...authHeaders(), "content-type": "application/json" },
-      body: JSON.stringify({ scenario }),
-    });
-    setNotice(response.ok ? "Notifikasi tes berhasil dikirim ke nomor customer." : "Notifikasi tes gagal dikirim. Pastikan WhatsApp sudah terhubung.");
-  };
-
   return (
     <main className="min-h-[calc(100dvh-76px)] bg-[#efe2d6] px-4 py-6 sm:px-8 lg:px-12">
       <div className="mx-auto max-w-6xl">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div><p className="text-sm text-[#765e52]">Dashboard Penghuni</p><h1 className="font-serif text-3xl font-bold">Halo, {data.customer.firstname}</h1></div>
-          <button onClick={() => { localStorage.clear(); navigate("/"); }} className="rounded-lg border border-[#caa897] px-4 py-2 text-sm">Keluar</button>
+          <button onClick={() => { logout(); navigate("/", { replace: true }); }} className="rounded-lg border border-[#caa897] px-4 py-2 text-sm">Keluar</button>
         </header>
         <section className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
           <div className="rounded-2xl border border-[#d1b4a4] bg-[#fffaf5] p-5 shadow-sm sm:p-7">
             <div className="mb-5 flex items-start justify-between gap-3"><div><p className="text-sm text-[#765e52]">Kamar aktif</p><h2 className="text-2xl font-bold">{data.room?.name || "Belum ada kamar"}</h2></div><span className="rounded-full bg-[#d9b9aa] px-3 py-1 text-xs font-semibold">Berpenghuni</span></div>
-            <p className="text-[#765e52]">Tagihan bulan ini</p>
-            <p className="mt-1 text-3xl font-bold">{money(invoice?.amount || 0)}</p>
-            <p className="mt-2 text-sm text-[#765e52]">Jatuh tempo: {invoice ? new Date(invoice.dueDate).toLocaleDateString("id-ID") : "-"}</p>
-            <Link to="/dashboard/customer/payment" className="mt-6 inline-block rounded-lg bg-[#694536] px-5 py-3 text-sm font-semibold text-white hover:bg-[#513329]">Buka pembayaran</Link>
+            {invoice ? <><p className="text-[#765e52]">Tagihan aktif</p><p className="mt-1 text-3xl font-bold">{money(invoice.amount)}</p><p className="mt-2 text-sm text-[#765e52]">Jatuh tempo: {new Date(invoice.dueDate).toLocaleDateString("id-ID")}</p><Link to="/dashboard/customer/payment" className="mt-6 inline-block rounded-lg bg-[#694536] px-5 py-3 text-sm font-semibold text-white hover:bg-[#513329]">Buka pembayaran</Link></> : <><p className="text-[#765e52]">Tagihan aktif</p><p className="mt-2 text-xl font-semibold">Tidak ada tagihan aktif</p><p className="mt-2 text-sm text-[#765e52]">Invoice berikutnya akan dibuat otomatis menjelang H-7 atau tanggal jatuh tempo.</p></>}
           </div>
           <div className="rounded-2xl border border-[#d1b4a4] bg-[#fffaf5] p-5 shadow-sm sm:p-7">
             <p className="mb-4 font-semibold">Riwayat tagihan</p>
-            <div className="space-y-3">{data.invoices.map((item) => <div key={item.invoiceNumber} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#e0c8bb] p-3 text-sm"><span><b>{item.invoiceNumber}</b><br /><span className="text-[#765e52]">{new Date(item.dueDate).toLocaleDateString("id-ID")}</span></span><div className="flex items-center gap-3"><span className={item.status === "paid" ? "text-green-700" : "text-orange-700"}>{item.status}</span><button type="button" onClick={() => void downloadCustomerInvoice(item.invoiceNumber)} className="rounded-lg border border-[#caa897] px-3 py-1.5 text-xs font-semibold hover:bg-[#f4e6dc]">Unduh PDF</button></div></div>)}</div>
+            <div className="space-y-3">{data.invoices.map((item) => <div key={item.invoiceNumber} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#e0c8bb] p-3 text-sm"><span><b>{item.invoiceNumber}</b><br /><span className="text-[#765e52]">{item.periodMonths && item.periodMonths > 1 ? `${item.periodMonths} bulan · ` : ""}{new Date(item.dueDate).toLocaleDateString("id-ID")}</span></span><div className="flex items-center gap-3"><span className={item.status === "paid" ? "text-green-700" : item.status === "cancelled" ? "text-[#765e52]" : "text-orange-700"}>{item.status}</span><button type="button" onClick={() => void downloadCustomerInvoice(item.invoiceNumber)} className="rounded-lg border border-[#caa897] px-3 py-1.5 text-xs font-semibold hover:bg-[#f4e6dc]">Unduh PDF</button></div></div>)}</div>
           </div>
         </section>
         {notice && <Toast message={notice} onClose={() => setNotice("")} />}
-        <div className="mt-5 rounded-2xl border border-[#d1b4a4] bg-[#fffaf5] p-5 sm:p-7"><h2 className="text-xl font-bold">Pembayaran cepat</h2><div className="mt-4 grid gap-3 sm:grid-cols-3"><button onClick={() => void payOnline("qris")} className="rounded-lg border border-[#caa897] p-4 text-left hover:bg-[#f4e6dc]"><b>QRIS</b><span className="mt-1 block text-sm text-[#765e52]">Konfirmasi otomatis</span></button><button onClick={() => void payOnline("bank_transfer")} className="rounded-lg border border-[#caa897] p-4 text-left hover:bg-[#f4e6dc]"><b>Virtual Account</b><span className="mt-1 block text-sm text-[#765e52]">Konfirmasi otomatis</span></button><button onClick={() => void submitCash()} className="rounded-lg border border-[#caa897] p-4 text-left hover:bg-[#f4e6dc]"><b>Cash</b><span className="mt-1 block text-sm text-[#765e52]">Menunggu konfirmasi owner</span></button></div></div>
-        <div className="mt-5 rounded-2xl border border-[#d1b4a4] bg-[#fffaf5] p-5 sm:p-7"><h2 className="text-xl font-bold">Tes notifikasi customer</h2><p className="mt-1 text-sm text-[#765e52]">Kirim simulasi pesan ke nomor customer yang tersimpan.</p><div className="mt-4 grid gap-3 sm:grid-cols-3"><button onClick={() => void sendTestNotification("h7")} className="rounded-lg border border-[#caa897] p-4 text-left hover:bg-[#f4e6dc]"><b>H-7</b><span className="mt-1 block text-sm text-[#765e52]">Pengingat tagihan</span></button><button onClick={() => void sendTestNotification("due_date")} className="rounded-lg border border-[#caa897] p-4 text-left hover:bg-[#f4e6dc]"><b>Jatuh tempo</b><span className="mt-1 block text-sm text-[#765e52]">Pesan due date</span></button><button onClick={() => void sendTestNotification("payment_success")} className="rounded-lg border border-[#caa897] p-4 text-left hover:bg-[#f4e6dc]"><b>Pembayaran berhasil</b><span className="mt-1 block text-sm text-[#765e52]">Simulasi sukses bayar</span></button></div></div>
+        <div className="mt-5 rounded-2xl border border-[#d1b4a4] bg-[#fffaf5] p-5 sm:p-7"><h2 className="text-xl font-bold">Pembayaran cepat</h2>{invoice ? <div className="mt-4 grid gap-3 sm:grid-cols-3"><button onClick={() => void payOnline("qris")} className="rounded-lg border border-[#caa897] p-4 text-left hover:bg-[#f4e6dc]"><b>QRIS</b><span className="mt-1 block text-sm text-[#765e52]">Konfirmasi otomatis</span></button><button onClick={() => void payOnline("bank_transfer")} className="rounded-lg border border-[#caa897] p-4 text-left hover:bg-[#f4e6dc]"><b>Virtual Account</b><span className="mt-1 block text-sm text-[#765e52]">Konfirmasi otomatis</span></button><button onClick={() => void submitCash()} className="rounded-lg border border-[#caa897] p-4 text-left hover:bg-[#f4e6dc]"><b>Cash</b><span className="mt-1 block text-sm text-[#765e52]">Menunggu konfirmasi owner</span></button></div> : <p className="mt-3 text-sm text-[#765e52]">Pembayaran akan tersedia setelah invoice aktif dibuat.</p>}</div>
       </div>
     </main>
   );

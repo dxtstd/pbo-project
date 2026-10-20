@@ -7,6 +7,9 @@ type InvoicePdfData = {
   status: string;
   customerName: string;
   roomName: string;
+  periodStartDate?: Date;
+  periodEndDate?: Date;
+  periodMonths?: number;
 };
 
 let browserPromise: Promise<Browser> | undefined;
@@ -47,15 +50,15 @@ export const generateInvoicePdf = async (invoice: InvoicePdfData): Promise<Uint8
         </head>
         <body>
           <article class="invoice">
-            <h1>Kost Camp M2</h1>
+            <h1>Kost Lorem Ipsum</h1>
             <p class="muted">Invoice pembayaran kost</p>
             <div class="row"><span>Nomor invoice</span><strong>${escapeHtml(invoice.invoiceNumber)}</strong></div>
             <div class="row"><span>Nama penghuni</span><strong>${escapeHtml(invoice.customerName)}</strong></div>
             <div class="row"><span>Kamar</span><strong>${escapeHtml(invoice.roomName)}</strong></div>
-            <div class="row"><span>Jatuh tempo</span><strong>${dueDate}</strong></div>
+            <div class="row"><span>${invoice.periodMonths && invoice.periodMonths > 1 ? "Periode pembayaran" : "Jatuh tempo"}</span><strong>${invoice.periodMonths && invoice.periodMonths > 1 && invoice.periodEndDate ? `${dueDate} - ${invoice.periodEndDate.toLocaleDateString("id-ID")}` : dueDate}</strong></div>
             <div class="row"><span>Status</span><strong class="status">${escapeHtml(invoice.status)}</strong></div>
             <div class="row total"><span>Total</span><strong>${amount}</strong></div>
-            <p class="muted">Dokumen ini dibuat oleh sistem Kost Camp M2.</p>
+            <p class="muted">Dokumen ini dibuat oleh sistem Kost Lorem Ipsum.</p>
           </article>
         </body>
       </html>`;

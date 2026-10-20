@@ -7,6 +7,8 @@ import Transaction from "../../../../models/transaction";
 import { config } from "../../../../config/env";
 import { requireRole } from "../../../../middlewares/auth";
 import { generateInvoicePdf } from "../../../../services/invoicePdf";
+import { isValidPhoneNumber, normalizePhoneNumber } from "../../../../utils/phone";
+import { createInvoiceForPeriod } from "../../../../services/invoice";
 
 const ownerDashboard = Router();
 const furnitureFee = 100000;
@@ -80,9 +82,10 @@ ownerDashboard.post("/:ownerId/customers", async (req, res) => {
   if (![customerId, username, firstname, lastname, phoneNumber, password].every(Boolean)) {
     return res.status(400).json({ message: "All customer fields are required" });
   }
+  if (!isValidPhoneNumber(String(phoneNumber))) return res.status(400).json({ message: "Nomor telepon tidak valid" });
   const bcrypt = await import("bcrypt");
   const customer = await Customer.create({
-    customerId, ownerId: req.params.ownerId, username, firstname, lastname, phoneNumber,
+    customerId, ownerId: req.params.ownerId, username, firstname, lastname, phoneNumber: normalizePhoneNumber(String(phoneNumber)),
     password: await bcrypt.hash(String(password), 12),
   });
   const { password: _password, ...safeCustomer } = customer.toObject();
@@ -120,6 +123,10 @@ ownerDashboard.patch("/:ownerId/customers/:customerId", async (req, res) => {
     return res.status(404).json({ message: "Customer not found for this owner" });
   }
   const updates = { ...req.body };
+  if (updates.phoneNumber !== undefined) {
+    if (!isValidPhoneNumber(String(updates.phoneNumber))) return res.status(400).json({ message: "Nomor telepon tidak valid" });
+    updates.phoneNumber = normalizePhoneNumber(String(updates.phoneNumber));
+  }
   if (updates.password) {
     const bcrypt = await import("bcrypt");
     updates.password = await bcrypt.hash(String(updates.password), 12);
@@ -161,6 +168,15 @@ ownerDashboard.delete("/:ownerId/customers/:customerId", async (req, res) => {
   if (!await customerBelongsToOwner(req.params.ownerId, req.params.customerId)) {
     return res.status(404).json({ message: "Customer not found for this owner" });
   }
+  const customer = await Customer.findOne({ customerId: req.params.customerId, ownerId: req.params.ownerId }).lean();
+  if (!customer) return res.status(404).json({ message: "Customer not found" });
+  const rooms = await Room.find({ customerId: req.params.customerId }).select("roomId name").lean();
+  const roomNames = new Map(rooms.map((room) => [room.roomId, room.name]));
+  const invoices = await Invoice.find({ customerId: req.params.customerId }).select("invoiceNumber roomId customerName roomName").lean();
+  await Promise.all(invoices.map((invoice) => Invoice.updateOne(
+    { invoiceNumber: invoice.invoiceNumber },
+    { $set: { customerName: invoice.customerName || `${customer.firstname} ${customer.lastname}`.trim(), roomName: invoice.roomName || roomNames.get(invoice.roomId) || invoice.roomId } },
+  )));
   const deleted = await Customer.deleteOne({ customerId: req.params.customerId, ownerId: req.params.ownerId });
   if (!deleted.deletedCount) return res.status(404).json({ message: "Customer not found" });
   return res.status(204).send();
@@ -222,8 +238,8 @@ ownerDashboard.post("/:ownerId/notification/pair", async (req, res) => {
 
 ownerDashboard.put("/:ownerId/notification/phone", async (req, res) => {
   if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot update this notification setup" });
-  const phone = String(req.body.phone || "").replace(/\D/g, "");
-  if (phone.length < 10 || phone.length > 15) return res.status(400).json({ message: "Nomor WhatsApp tidak valid" });
+  const phone = normalizePhoneNumber(String(req.body.phone || ""));
+  if (!isValidPhoneNumber(phone)) return res.status(400).json({ message: "Nomor WhatsApp tidak valid" });
   const owner = await Owner.findOneAndUpdate(
     { ownerId: req.params.ownerId },
     { notificationPhone: phone },
@@ -262,8 +278,8 @@ ownerDashboard.post("/:ownerId/notification/test", async (req, res) => {
   if (!["cash_request", "transaction_success"].includes(scenario || "")) {
     return res.status(400).json({ message: "Notification scenario tidak valid" });
   }
-  const phone = recipient?.replace(/\D/g, "");
-  if (!phone || phone.length < 10 || phone.length > 15) {
+  const phone = recipient ? normalizePhoneNumber(recipient) : "";
+  if (!phone || !isValidPhoneNumber(phone)) {
     return res.status(400).json({ message: "Nomor WhatsApp tidak valid" });
   }
   try {
@@ -273,8 +289,8 @@ ownerDashboard.post("/:ownerId/notification/test", async (req, res) => {
       body: JSON.stringify({
         recipient: phone,
         message: scenario === "cash_request"
-          ? "Kost Camp M2\nPERMINTAAN PEMBAYARAN CASH\nAda customer yang meminta konfirmasi pembayaran cash. Silakan buka dashboard untuk memeriksa."
-          : "Kost Camp M2\nTRANSAKSI BERHASIL\nPembayaran customer berhasil diterima dan tercatat di sistem.",
+          ? "Kost Lorem Ipsum\nPERMINTAAN PEMBAYARAN CASH\nAda customer yang meminta konfirmasi pembayaran cash. Silakan buka dashboard untuk memeriksa."
+          : "Kost Lorem Ipsum\nTRANSAKSI BERHASIL\nPembayaran customer berhasil diterima dan tercatat di sistem.",
       }),
     });
     if (!response.ok) return res.status(502).json({ message: "Test notification could not be sent" });
@@ -317,15 +333,54 @@ ownerDashboard.get("/:ownerId/invoices/:invoiceNumber/pdf", async (req, res) => 
     Room.findOne({ roomId: invoice.roomId }).lean(),
     Customer.findOne({ customerId: invoice.customerId }).lean(),
   ]);
-  if (!room || !customer) return res.status(404).json({ message: "Invoice does not belong to this owner" });
+  const customerName = invoice.customerName || (customer ? `${customer.firstname} ${customer.lastname}`.trim() : "");
+  const roomName = invoice.roomName || room?.name || "";
+  if (!customerName || !roomName) return res.status(404).json({ message: "Invoice does not belong to this owner" });
   try {
     const pdf = await generateInvoicePdf({
       invoiceNumber: invoice.invoiceNumber,
       amount: invoice.amount,
       dueDate: invoice.dueDate,
       status: invoice.status,
-      customerName: `${customer.firstname} ${customer.lastname}`.trim(),
-      roomName: room.name,
+      customerName,
+      roomName,
+      periodStartDate: invoice.periodStartDate,
+      periodEndDate: invoice.periodEndDate,
+      periodMonths: invoice.periodMonths,
+    });
+
+    ownerDashboard.patch("/:ownerId/invoices/:invoiceNumber", async (req, res) => {
+      if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot modify this invoice" });
+      const invoice = await Invoice.findOne({ invoiceNumber: req.params.invoiceNumber }).lean();
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      const room = await Room.findOne({ roomId: invoice.roomId, ownerId: req.params.ownerId }).select("roomId").lean();
+      if (!room) return res.status(403).json({ message: "Invoice does not belong to this owner" });
+      const updates: { amount?: number; basePrice?: number; totalAmount?: number; dueDate?: Date } = {};
+      if (req.body.amount !== undefined) {
+        const amount = Number(req.body.amount);
+        if (!Number.isFinite(amount) || amount < 0) return res.status(400).json({ message: "Nominal invoice tidak valid" });
+        updates.amount = amount;
+        updates.basePrice = amount;
+        updates.totalAmount = amount;
+      }
+      if (req.body.dueDate !== undefined) {
+        const dueDate = new Date(req.body.dueDate);
+        if (Number.isNaN(dueDate.getTime())) return res.status(400).json({ message: "Tanggal jatuh tempo tidak valid" });
+        updates.dueDate = dueDate;
+      }
+      const updated = await Invoice.findOneAndUpdate({ invoiceNumber: req.params.invoiceNumber }, updates, { new: true, runValidators: true }).lean();
+      return res.json({ invoice: updated });
+    });
+
+    ownerDashboard.delete("/:ownerId/invoices/:invoiceNumber", async (req, res) => {
+      if (req.user?.id !== req.params.ownerId) return res.status(403).json({ message: "Cannot delete this invoice" });
+      const invoice = await Invoice.findOne({ invoiceNumber: req.params.invoiceNumber }).lean();
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      const room = await Room.findOne({ roomId: invoice.roomId, ownerId: req.params.ownerId }).select("roomId").lean();
+      if (!room) return res.status(403).json({ message: "Invoice does not belong to this owner" });
+      if (invoice.status === "paid") return res.status(409).json({ message: "Invoice yang sudah lunas tidak dapat dihapus" });
+      await Invoice.deleteOne({ invoiceNumber: req.params.invoiceNumber });
+      return res.status(204).send();
     });
     res.setHeader("content-type", "application/pdf");
     res.setHeader("content-disposition", `attachment; filename="${invoice.invoiceNumber}.pdf"`);
@@ -441,6 +496,8 @@ ownerDashboard.patch("/:ownerId/rooms/:roomId/customer", async (req, res) => {
     customerId?: string | null;
     rentalStartDate?: string;
     monthlyDueDay?: number;
+    forceMove?: boolean;
+    rentalMonths?: number;
   };
   const room = await Room.findOne({ roomId: req.params.roomId, ownerId: req.params.ownerId }).lean();
   if (!room) return res.status(404).json({ message: "Kamar tidak ditemukan" });
@@ -454,12 +511,23 @@ ownerDashboard.patch("/:ownerId/rooms/:roomId/customer", async (req, res) => {
     return res.json(updated);
   }
 
+  if (room.customerId && room.customerId !== customerId) {
+    const unpaidInvoice = await Invoice.exists({ customerId: room.customerId, roomId: room.roomId, status: { $ne: "paid" } });
+    if (unpaidInvoice && !req.body.forceMove) {
+      return res.status(409).json({ message: "Invoice penghuni lama harus diselesaikan sebelum pindah kamar. Gunakan opsi paksa jika diperlukan." });
+    }
+  }
+
   if (!rentalStartDate || typeof monthlyDueDay !== "number" || !Number.isInteger(monthlyDueDay) || monthlyDueDay < 1 || monthlyDueDay > 31) {
     return res.status(400).json({ message: "Tanggal mulai sewa dan tanggal jatuh tempo 1–31 wajib diisi" });
   }
   const startDate = new Date(rentalStartDate);
   if (Number.isNaN(startDate.getTime())) return res.status(400).json({ message: "Tanggal mulai sewa tidak valid" });
   const dueDay = monthlyDueDay;
+  const rentalMonths = req.body.rentalMonths === undefined ? 1 : Number(req.body.rentalMonths);
+  if (!Number.isInteger(rentalMonths) || rentalMonths < 1 || rentalMonths > 10) {
+    return res.status(400).json({ message: "Durasi sewa harus antara 1 sampai 10 bulan" });
+  }
   if (customerId) {
     const customer = await Customer.findOne({ customerId, ownerId: req.params.ownerId }).select("customerId").lean();
     if (!customer) return res.status(404).json({ message: "Customer tidak ditemukan" });
@@ -469,22 +537,29 @@ ownerDashboard.patch("/:ownerId/rooms/:roomId/customer", async (req, res) => {
       roomId: { $ne: req.params.roomId },
     }).select("roomId").lean();
     if (occupiedByAnotherRoom) {
-      return res.status(409).json({ message: "Customer sudah menempati kamar lain" });
+      const unpaidInvoice = await Invoice.exists({
+        customerId,
+        roomId: occupiedByAnotherRoom.roomId,
+        status: { $in: ["unpaid", "overdue"] },
+      });
+      if (unpaidInvoice && !req.body.forceMove) {
+        return res.status(409).json({ message: "Invoice penghuni harus diselesaikan sebelum pindah kamar. Gunakan konfirmasi pemindahan untuk melanjutkan." });
+      }
+      await Room.updateOne(
+        { roomId: occupiedByAnotherRoom.roomId, ownerId: req.params.ownerId, customerId },
+        { $unset: { customerId: 1, rentalStartDate: 1, monthlyDueDay: 1 }, $set: { isOccupied: false } },
+      );
     }
   }
 
   const dueDate = getClampedDueDate(startDate.getFullYear(), startDate.getMonth(), dueDay);
-  const existingInvoice = await Invoice.findOne({ roomId: room.roomId, customerId }).sort({ createdAt: -1 }).lean();
-  const invoice = existingInvoice || await Invoice.create({
-    invoiceNumber: `INV-${Date.now().toString(36).toUpperCase()}`,
+  const customer = await Customer.findOne({ customerId }).select("firstname lastname").lean();
+  if (!customer) return res.status(404).json({ message: "Customer tidak ditemukan" });
+  const invoice = await createInvoiceForPeriod({
     customerId,
     roomId: room.roomId,
-    basePrice: room.price,
-    additionalFees: 0,
-    totalAmount: room.price,
-    amount: room.price,
-    dueDate,
-    status: "unpaid",
+    startDate: dueDate,
+    months: rentalMonths,
   });
   const updated = await Room.findOneAndUpdate(
     { roomId: req.params.roomId, ownerId: req.params.ownerId },

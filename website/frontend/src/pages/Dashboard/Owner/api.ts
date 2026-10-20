@@ -42,7 +42,7 @@ export const deleteRoom = async (ownerId: string, roomId: string) => {
   }
 };
 
-export const assignRoomCustomer = async (ownerId: string, roomId: string, payload: { customerId: string | null; rentalStartDate?: string; monthlyDueDay?: number }) => {
+export const assignRoomCustomer = async (ownerId: string, roomId: string, payload: { customerId: string | null; rentalStartDate?: string; monthlyDueDay?: number; rentalMonths?: number; forceMove?: boolean }) => {
   const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/rooms/${roomId}/customer`, {
     method: "PATCH",
     headers: { ...authHeaders(), "content-type": "application/json" },
@@ -87,4 +87,18 @@ export const deleteCustomer = (ownerId: string, customerId: string) =>
 export const confirmCash = async (transactionId: string) => {
   const response = await fetch(`${API_URL}/payment/cash/${transactionId}/confirm`, { method: "POST", headers: authHeaders() });
   if (!response.ok) throw new Error("Pembayaran cash gagal dikonfirmasi");
+};
+
+export const updateInvoice = async (ownerId: string, invoiceNumber: string, payload: { amount?: number; dueDate?: string }) => {
+  const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/invoices/${encodeURIComponent(invoiceNumber)}`, {
+    method: "PATCH",
+    headers: { ...authHeaders(), "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error((await response.json().catch(() => ({})) as { message?: string }).message || "Invoice gagal diperbarui");
+};
+
+export const deleteInvoice = async (ownerId: string, invoiceNumber: string) => {
+  const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/invoices/${encodeURIComponent(invoiceNumber)}`, { method: "DELETE", headers: authHeaders() });
+  if (!response.ok) throw new Error((await response.json().catch(() => ({})) as { message?: string }).message || "Invoice gagal dihapus");
 };

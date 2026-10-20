@@ -16,6 +16,7 @@ export class PaymentService {
 
   public async requestCash(invoiceNumber: string, customerId: string) {
     const invoice = await this.findUnpaidInvoice(invoiceNumber, customerId);
+    await this.ensureNoActiveTransaction(invoice.invoiceNumber);
     const transaction = await Transaction.create({
       transactionId: `CASH-${crypto.randomUUID()}`,
       invoiceNumber: invoice.invoiceNumber,
@@ -34,6 +35,7 @@ export class PaymentService {
       throw new Error("Unsupported payment type");
     }
     const invoice = await this.findUnpaidInvoice(invoiceNumber, customerId);
+    await this.ensureNoActiveTransaction(invoice.invoiceNumber);
     const customer = await Customer.findOne({ customerId: invoice.customerId }).lean();
     if (!customer) throw new Error("Customer not found");
     const orderId = `INV-${invoice.invoiceNumber}-${Date.now()}`;
@@ -54,6 +56,7 @@ export class PaymentService {
       paymentDate: new Date(),
       totalAmount: invoice.amount,
       status: "pending",
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
     return charge;
   }
@@ -85,9 +88,30 @@ export class PaymentService {
     return { transactionId: transaction.transactionId, status: transaction.status };
   }
 
+  public async cancelCash(transactionId: string, customerId: string) {
+    const transaction = await Transaction.findOneAndUpdate(
+      { transactionId, customerId, status: "cash_pending" },
+      { status: "cancel" },
+      { new: true },
+    );
+    if (!transaction) throw new Error("Cash payment not found or already closed");
+    return { transactionId: transaction.transactionId, status: transaction.status };
+  }
+
   private async findUnpaidInvoice(invoiceNumber: string, customerId: string) {
-    const invoice = await Invoice.findOne({ invoiceNumber, customerId, status: { $ne: "paid" } });
+    const invoice = await Invoice.findOne({ invoiceNumber, customerId, status: { $in: ["unpaid", "overdue"] } });
     if (!invoice) throw new Error("Unpaid invoice not found");
     return invoice;
+  }
+
+  private async ensureNoActiveTransaction(invoiceNumber: string) {
+    const active = await Transaction.exists({
+      invoiceNumber,
+      $or: [
+        { status: "cash_pending" },
+        { status: "pending", $or: [{ expiresAt: { $gt: new Date() } }, { expiresAt: { $exists: false } }] },
+      ],
+    });
+    if (active) throw new Error("Masih ada permintaan pembayaran aktif. Batalkan atau tunggu transaksi sebelumnya selesai.");
   }
 }

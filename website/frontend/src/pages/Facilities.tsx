@@ -17,10 +17,10 @@ export const Facilities = function ({ title, description }: { title?: string; de
         {/* Header */}
         <div className="mb-8 max-w-2xl">
           <h1 className="mb-2 font-serif text-2xl font-bold text-[#4A3B32] sm:text-3xl">
-          {title || "Fasilitas Kost Camp M2"}
+          {title || "Fasilitas Kost Lorem Ipsum"}
           </h1>
           <p className="text-sm text-[#6C5A52]">
-            {description || "Nikmati kenyamanan tinggal di Kost Camp M2 dengan fasilitas lengkap yang dirancang untuk mendukung aktivitas harian, kenyamanan, dan ketenangan Anda."}
+            {description || "Nikmati kenyamanan tinggal di Kost Lorem Ipsum dengan fasilitas lengkap yang dirancang untuk mendukung aktivitas harian, kenyamanan, dan ketenangan Anda."}
           </p>
         </div>
 

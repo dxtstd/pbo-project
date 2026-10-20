@@ -53,6 +53,7 @@ export class MidtransGateway implements PaymentGateway {
           email: input.customerEmail,
           phone: input.customerPhone,
         },
+        custom_expiry: { expiry_duration: 24, unit: "hour" },
       }
     : {
         payment_type: "bank_transfer",
@@ -63,6 +64,7 @@ export class MidtransGateway implements PaymentGateway {
           phone: input.customerPhone,
         },
         bank_transfer: { bank: "bca" },
+        custom_expiry: { expiry_duration: 24, unit: "hour" },
       };
 
   const response = await fetch(`${this.apiBase}/v2/charge`, {

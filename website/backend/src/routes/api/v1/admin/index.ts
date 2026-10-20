@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import Owner from "../../../../models/owner";
 import SiteContent from "../../../../models/siteContent";
 import { requireAuth, isAdmin } from "../../../../middlewares/auth";
+import { isValidPhoneNumber, normalizePhoneNumber } from "../../../../utils/phone";
 
 const admin = Router();
 
@@ -77,6 +78,7 @@ admin.post("/owners", async (req, res) => {
   if (![ownerId, username, firstname, lastname, email, phoneNumber, password].every(Boolean)) {
     return res.status(400).json({ message: "All owner fields are required" });
   }
+  if (!isValidPhoneNumber(String(phoneNumber))) return res.status(400).json({ message: "Nomor telepon tidak valid" });
 
   const owner = await Owner.create({
     ownerId,
@@ -84,7 +86,7 @@ admin.post("/owners", async (req, res) => {
     firstname,
     lastname,
     email,
-    phoneNumber,
+    phoneNumber: normalizePhoneNumber(String(phoneNumber)),
     password: await bcrypt.hash(password, 12),
   });
   const ownerData = owner.toObject();
@@ -142,6 +144,10 @@ admin.patch("/owners/:ownerId", async (req, res) => {
   const updates = Object.fromEntries(
     allowed.filter((field) => req.body[field] !== undefined).map((field) => [field, req.body[field]]),
   );
+  if (updates.phoneNumber !== undefined) {
+    if (!isValidPhoneNumber(String(updates.phoneNumber))) return res.status(400).json({ message: "Nomor telepon tidak valid" });
+    updates.phoneNumber = normalizePhoneNumber(String(updates.phoneNumber));
+  }
   if (req.body.password) updates.password = await bcrypt.hash(String(req.body.password), 12);
   const owner = await Owner.findOneAndUpdate(
     { ownerId: req.params.ownerId },

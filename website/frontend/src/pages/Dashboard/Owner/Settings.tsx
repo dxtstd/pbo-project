@@ -63,7 +63,7 @@ export function OwnerSettings() {
 
   const saveNotificationPhone = async () => {
     if (!ownerId) return;
-    const phone = notificationPhone.replace(/\D/g, "");
+    const phone = notificationPhone.replace(/\D/g, "").replace(/^0/, "62");
     if (phone.length < 10 || phone.length > 15) {
       setMessage("Pilih nomor WhatsApp owner yang valid.");
       return;
@@ -84,7 +84,7 @@ export function OwnerSettings() {
 
   const sendTestNotification = async (scenario: "cash_request" | "transaction_success") => {
     if (!ownerId) return;
-    const phone = (testPhone || notificationPhone).replace(/\D/g, "");
+    const phone = (testPhone || notificationPhone).replace(/\D/g, "").replace(/^0/, "62");
     if (phone.length < 10 || phone.length > 15) {
       setMessage("Masukkan nomor WhatsApp yang valid, termasuk kode negara.");
       return;

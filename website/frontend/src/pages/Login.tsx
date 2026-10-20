@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { LoginFormData } from '../types';
 import { API_URL } from '../config';
@@ -11,6 +11,13 @@ export const Login: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
+  const currentUser = useAuthStore((state) => state.user);
+
+  useEffect(() => {
+    if (currentUser) {
+      navigate(currentUser.role === 'owner' ? '/dashboard/owner' : currentUser.role === 'customer' ? '/dashboard/customer' : '/admin', { replace: true });
+    }
+  }, [currentUser, navigate]);
 
   const handleSubmit = async () => {
     setError('');
