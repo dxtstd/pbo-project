@@ -111,12 +111,21 @@ const redactPhone = (phone: string): string => {
  * @throws Error when the event has no recipient or WhatsApp delivery fails.
  */
 const sendEvent = async (event: Record<string, unknown>): Promise<void> => {
-  if (!["invoice_created", "invoice_due", "cash_requested", "payment_received", "extension_requested"].includes(String(event.type))) return;
+  const supportedEventTypes = ["invoice_created", "invoice_due", "cash_requested", "payment_received", "extension_requested"];
+  if (!supportedEventTypes.includes(String(event.type))) {
+    throw new Error(`Unsupported notification event type: ${String(event.type)}`);
+  }
 
   const recipientValue = event.recipientPhone || (["invoice_created", "invoice_due"].includes(String(event.type)) ? event.customerPhone : event.ownerPhone);
   const recipient = typeof recipientValue === "string" ? recipientValue.trim() : "";
   if (!recipient) throw new Error("Notification event has no recipient phone number");
   const recipientJid = normalizePhone(recipient);
+  if (!/^\d{8,15}@s\.whatsapp\.net$/.test(recipientJid)) {
+    throw new Error(`Invalid notification recipient JID: ${recipientJid}`);
+  }
+  if (connectionStatus !== "open") {
+    throw new Error(`WhatsApp is not connected (status: ${connectionStatus}, state: ${zapo.getState()})`);
+  }
 
   const message = typeof event.message === "string" && event.message
     ? event.message
@@ -161,7 +170,13 @@ const sendEvent = async (event: Record<string, unknown>): Promise<void> => {
     messageLength: message.length,
   }, "Sending automatic WhatsApp notification");
   try {
-    await zapo.message.send(recipientJid, message);
+    const sendResult = await zapo.message.send(recipientJid, message);
+    logger.info({
+      deliveryId: event.deliveryId,
+      eventType: event.type,
+      recipientJid: redactPhone(recipientJid),
+      result: sendResult,
+    }, "WhatsApp provider accepted notification");
   } catch (error) {
     logger.error({
       err: error,
