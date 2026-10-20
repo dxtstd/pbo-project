@@ -1,13 +1,13 @@
 import { createApp } from "./app";
 import { config } from "./config/env";
 import { connectDatabase } from "./infrastructure/database";
-import { seedDevelopmentUsers } from "./infrastructure/developmentSeed";
+import { seedDevelopmentContent } from "./infrastructure/developmentSeed";
 import { startInvoiceReminderJob } from "./jobs/invoiceReminders";
 import { notificationBridge } from "./services/notification";
 
 const startServer = async (): Promise<void> => {
   await connectDatabase();
-  await seedDevelopmentUsers();
+  await seedDevelopmentContent();
   notificationBridge.connect();
   startInvoiceReminderJob();
 
