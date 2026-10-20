@@ -7,7 +7,6 @@ export interface ICustomer extends Document {
   firstname: string;
   lastname: string;
   phoneNumber: string;
-  notificationEnabled: boolean;
   password: string;
 }
 
@@ -18,7 +17,6 @@ const CustomerSchema: Schema = new Schema({
   firstname: { type: String, required: true },
   lastname: { type: String, required: false, default: "" },
   phoneNumber: { type: String, required: true },
-  notificationEnabled: { type: Boolean, default: true },
   password: { type: String, required: true },
 }, {
   timestamps: true,

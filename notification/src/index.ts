@@ -145,6 +145,31 @@ const sendTestMessage = async (body: string): Promise<void> => {
 };
 
 const server = createServer((request, response) => {
+  if (request.url === "/event" && request.method === "POST") {
+    let body = "";
+    request.on("data", (chunk) => { body += chunk.toString(); });
+    request.on("end", () => {
+      let event: Record<string, unknown>;
+      try {
+        event = JSON.parse(body) as Record<string, unknown>;
+      } catch {
+        response.writeHead(400, { "content-type": "application/json" });
+        response.end(JSON.stringify({ message: "Invalid notification event JSON" }));
+        return;
+      }
+      void sendEvent(event)
+        .then(() => {
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({ sent: true }));
+        })
+        .catch((error: unknown) => {
+          console.error("Failed to deliver HTTP notification event", error);
+          response.writeHead(503, { "content-type": "application/json" });
+          response.end(JSON.stringify({ message: error instanceof Error ? error.message : "Notification event failed" }));
+        });
+    });
+    return;
+  }
   if (request.url === "/test" && request.method === "POST") {
     let body = "";
     request.on("data", (chunk) => { body += chunk.toString(); });
@@ -208,6 +233,7 @@ websocket.on("connection", (socket) => {
   socket.on("message", async (raw) => {
     try {
       const event = JSON.parse(raw.toString()) as Record<string, unknown>;
+      console.log(`Delivering ${String(event.type)} notification to ${String(event.recipientPhone || event.customerPhone || event.ownerPhone || "unknown")}`);
       await sendEvent(event);
     } catch (error) {
       console.error("Failed to process notification event", error);

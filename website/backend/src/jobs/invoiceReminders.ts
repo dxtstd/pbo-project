@@ -2,7 +2,7 @@ import Customer from "../models/customer";
 import Invoice from "../models/invoice";
 import Owner from "../models/owner";
 import Room from "../models/room";
-import { notificationBridge, renderNotificationTemplate } from "../services/notification";
+import { isNotificationCategoryEnabled, notificationBridge, renderNotificationTemplate } from "../services/notification";
 import { createNextInvoice } from "../services/invoice";
 
 const reminderDays = [7, 0];
@@ -38,7 +38,7 @@ export const sendInvoiceReminders = async (): Promise<void> => {
         ? await Owner.findOne({ ownerId: room.ownerId }).lean()
         : undefined;
 
-      if (!customer || !owner || customer.notificationEnabled === false || owner.notificationEnabled === false) {
+      if (!customer || !owner || !(await isNotificationCategoryEnabled(owner.ownerId, "invoice_due"))) {
         console.error(`Cannot notify invoice ${invoice.invoiceNumber}: customer or owner not found`);
         continue;
       }

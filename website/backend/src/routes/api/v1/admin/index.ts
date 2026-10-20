@@ -125,24 +125,12 @@ admin.get("/notification/recipients", async (_req, res) => {
   });
 });
 
-admin.post("/notification/test", async (req, res) => {
-  const recipient = typeof req.body?.recipient === "string" ? req.body.recipient.trim() : "";
-  const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
-  if (!recipient || !message) return res.status(400).json({ message: "Nomor penerima dan pesan wajib diisi" });
-  const phone = normalizePhoneNumber(recipient);
-  if (!isValidPhoneNumber(phone)) return res.status(400).json({ message: "Nomor WhatsApp tidak valid" });
-  try {
-    const response = await fetch(`${config.notificationHttpUrl}/test`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ recipient: phone, message }),
-    });
-
-    admin.post("/notification/test-event", async (req, res) => {
+admin.post("/notification/test-event", async (req, res) => {
       const recipient = typeof req.body?.recipient === "string" ? req.body.recipient.trim() : "";
       const event = req.body?.event as NotificationTemplateKey;
       const audience = req.body?.audience as NotificationAudience;
-      if (!recipient || !Object.keys(defaultNotificationTemplates.customer).includes(event) || !["owner", "customer"].includes(audience)) {
+      const validEvents = new Set(Object.keys(defaultNotificationTemplates.customer).concat(Object.keys(defaultNotificationTemplates.owner)));
+      if (!recipient || !validEvents.has(event) || !["owner", "customer"].includes(audience)) {
         return res.status(400).json({ message: "Event dan penerima testing tidak valid" });
       }
       const phone = normalizePhoneNumber(recipient);
@@ -173,6 +161,19 @@ admin.post("/notification/test", async (req, res) => {
       } catch {
         return res.status(503).json({ message: "Notification service unavailable" });
       }
+});
+
+admin.post("/notification/test", async (req, res) => {
+  const recipient = typeof req.body?.recipient === "string" ? req.body.recipient.trim() : "";
+  const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+  if (!recipient || !message) return res.status(400).json({ message: "Nomor penerima dan pesan wajib diisi" });
+  const phone = normalizePhoneNumber(recipient);
+  if (!isValidPhoneNumber(phone)) return res.status(400).json({ message: "Nomor WhatsApp tidak valid" });
+  try {
+    const response = await fetch(`${config.notificationHttpUrl}/test`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ recipient: phone, message }),
     });
     const result = await response.json().catch(() => ({})) as { message?: string };
     if (!response.ok) return res.status(502).json({ message: result.message || "Test notification gagal dikirim" });

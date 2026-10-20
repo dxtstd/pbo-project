@@ -8,7 +8,13 @@
     email: string;
     phoneNumber: string;
     notificationPhone?: string;
-    notificationEnabled: boolean;
+    notificationPreferences: {
+      invoice_created: boolean;
+      invoice_due: boolean;
+      cash_requested: boolean;
+      payment_received: boolean;
+      extension_requested: boolean;
+    };
     password: string;
   }
 
@@ -20,7 +26,13 @@
     email: { type: String, required: true, unique: true, index: true },
     phoneNumber: { type: String, required: true },
     notificationPhone: { type: String, required: false },
-    notificationEnabled: { type: Boolean, default: true },
+    notificationPreferences: {
+      invoice_created: { type: Boolean, default: true },
+      invoice_due: { type: Boolean, default: true },
+      cash_requested: { type: Boolean, default: true },
+      payment_received: { type: Boolean, default: true },
+      extension_requested: { type: Boolean, default: true },
+    },
     password: { type: String, required: true },
   }, {
     timestamps: true,

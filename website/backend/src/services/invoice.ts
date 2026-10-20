@@ -1,7 +1,7 @@
 import Customer from "../models/customer";
 import Invoice from "../models/invoice";
 import Room from "../models/room";
-import { publishInvoiceCreated, renderNotificationTemplate } from "./notification";
+import { isNotificationCategoryEnabled, publishInvoiceCreated, renderNotificationTemplate } from "./notification";
 
 const addMonths = (date: Date, months: number): Date => {
   const result = new Date(date);
@@ -32,7 +32,7 @@ export const createInvoiceForPeriod = async (input: {
     throw new Error("Durasi invoice harus antara 1 sampai 12 bulan");
   }
   const [customer, room] = await Promise.all([
-    Customer.findOne({ customerId: input.customerId }).select("firstname lastname phoneNumber notificationEnabled").lean(),
+    Customer.findOne({ customerId: input.customerId }).select("firstname lastname phoneNumber").lean(),
     Room.findOne({ roomId: input.roomId }).select("name price ownerId").lean(),
   ]);
   if (!customer || !room) throw new Error("Customer atau kamar tidak ditemukan");
@@ -63,7 +63,7 @@ export const createInvoiceForPeriod = async (input: {
     periodEndDate: endDate,
     periodMonths: input.months,
   });
-  if (input.notifyCreated !== false && customer.notificationEnabled !== false && customer.phoneNumber) {
+  if (input.notifyCreated !== false && customer.phoneNumber && await isNotificationCategoryEnabled(room.ownerId, "invoice_created")) {
     const message = await renderNotificationTemplate("invoice_created", {
       customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
       invoice_number: invoice.invoiceNumber,

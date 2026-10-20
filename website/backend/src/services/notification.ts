@@ -1,9 +1,12 @@
 import WebSocket from "ws";
 import NotificationTemplate from "../models/notificationTemplate";
 import SiteContent from "../models/siteContent";
+import Owner from "../models/owner";
+import { config } from "../config/env";
 
 export type NotificationTemplateKey = "invoice_created" | "invoice_due" | "cash_requested" | "payment_received" | "extension_requested";
 export type NotificationAudience = "owner" | "customer";
+export type NotificationCategory = NotificationTemplateKey;
 export type NotificationTemplateValues = Record<string, string | number | undefined>;
 
 export const defaultNotificationTemplates: Record<NotificationAudience, Record<NotificationTemplateKey, { header: string; content: string }>> = {
@@ -36,6 +39,12 @@ export const renderNotificationTemplate = async (event: NotificationTemplateKey,
   const renderedHeader = header.replace(/%([a-z_]+)%/g, (_match, key: string) => String(values[key] ?? (key === "name_business" ? business?.siteName : "")));
   const rendered = content.replace(/%([a-z_]+)%/g, (_match, key: string) => String(values[key] ?? (key === "name_business" ? business?.siteName : "")));
   return `${values.name_business || business?.siteName || "Kost Lorem Ipsum"}\n=============\n${renderedHeader}\n\n${rendered}`;
+};
+
+export const isNotificationCategoryEnabled = async (ownerId: string | undefined, category: NotificationCategory): Promise<boolean> => {
+  if (!ownerId) return false;
+  const owner = await Owner.findOne({ ownerId }).select("notificationPreferences").lean();
+  return owner?.notificationPreferences?.[category] !== false;
 };
 
 export type NotificationEvent =
@@ -130,17 +139,33 @@ class NotificationBridge {
 
   publish(event: NotificationEvent): void {
     if (this.socket?.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(event));
+      this.socket.send(JSON.stringify(event), (error) => {
+        if (error) {
+          console.error(`Failed to send ${event.type} notification over WebSocket`, error);
+          this.pendingEvents.push(event);
+          this.connect();
+        }
+      });
       return;
     }
 
-    this.pendingEvents.push(event);
-    this.connect();
+    void fetch(`${config.notificationHttpUrl}/event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(event),
+    }).then((response) => {
+      if (!response.ok) throw new Error(`Notification service returned ${response.status}`);
+    }).catch((error: unknown) => {
+      console.error(`Failed to send ${event.type} notification over HTTP`, error);
+      this.pendingEvents.push(event);
+      this.connect();
+    });
   }
 
   private flush(): void {
     while (this.pendingEvents.length > 0 && this.socket?.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(this.pendingEvents.shift()));
+      const event = this.pendingEvents.shift();
+      if (event) this.socket.send(JSON.stringify(event));
     }
   }
 

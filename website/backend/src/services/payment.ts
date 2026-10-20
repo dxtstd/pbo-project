@@ -4,7 +4,7 @@ import Invoice from "../models/invoice";
 import Transaction, { type ITransaction } from "../models/transaction";
 import Room from "../models/room";
 import Owner from "../models/owner";
-import { publishCashRequested, publishPaymentReceived, renderNotificationTemplate } from "./notification";
+import { isNotificationCategoryEnabled, publishCashRequested, publishPaymentReceived, renderNotificationTemplate } from "./notification";
 import {
   isSuccessfulMidtransStatus,
   type MidtransCharge,
@@ -34,9 +34,9 @@ export class PaymentService {
       Customer.findOne({ customerId: invoice.customerId }).select("firstname lastname").lean(),
       Room.findOne({ roomId: invoice.roomId }).select("ownerId").lean(),
     ]);
-    const owner = room?.ownerId ? await Owner.findOne({ ownerId: room.ownerId }).select("firstname lastname phoneNumber notificationPhone notificationEnabled").lean() : undefined;
+    const owner = room?.ownerId ? await Owner.findOne({ ownerId: room.ownerId }).select("firstname lastname phoneNumber notificationPhone").lean() : undefined;
     const ownerPhone = owner?.notificationPhone || owner?.phoneNumber;
-    if (customer && owner && owner.notificationEnabled !== false && ownerPhone) {
+    if (customer && owner && ownerPhone && await isNotificationCategoryEnabled(room?.ownerId, "cash_requested")) {
       const message = await renderNotificationTemplate("cash_requested", {
         customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
         invoice_number: invoice.invoiceNumber,
@@ -144,7 +144,7 @@ export class PaymentService {
       payment_method: transaction.paymentMethod,
       dashboard_link: "/dashboard/owner",
     });
-    if (owner.notificationEnabled !== false) publishPaymentReceived({
+    if (await isNotificationCategoryEnabled(room?.ownerId, "payment_received")) publishPaymentReceived({
       type: "payment_received",
       invoiceNumber: transaction.invoiceNumber,
       customerName: `${customer.firstname} ${customer.lastname}`.trim(),
@@ -155,7 +155,7 @@ export class PaymentService {
       paymentDate: transaction.paymentDate.toISOString(),
       message,
     });
-    if (customer.notificationEnabled !== false && customer.phoneNumber) {
+    if (customer.phoneNumber && await isNotificationCategoryEnabled(room?.ownerId, "payment_received")) {
       const customerMessage = await renderNotificationTemplate("payment_received", {
         customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
         invoice_number: transaction.invoiceNumber,
