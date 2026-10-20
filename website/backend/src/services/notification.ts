@@ -2,20 +2,37 @@ import WebSocket from "ws";
 import NotificationTemplate from "../models/notificationTemplate";
 
 export type NotificationTemplateKey = "invoice_created" | "invoice_due" | "cash_requested" | "payment_received" | "extension_requested";
+export type NotificationAudience = "owner" | "customer";
 export type NotificationTemplateValues = Record<string, string | number | undefined>;
 
-export const defaultNotificationTemplates: Record<NotificationTemplateKey, string> = {
-  invoice_created: "Halo %customer_name%,\nInvoice %invoice_number% sebesar %payment% telah dibuat.\nJatuh tempo: %due_date%.\nBuka %dashboard_link% untuk melanjutkan pembayaran.",
-  invoice_due: "Halo %customer_name%,\nInvoice %invoice_number% sebesar %payment% akan jatuh tempo pada %due_date%.\nPengingat H-%days_before_due%.",
-  cash_requested: "Permintaan pembayaran cash dari %customer_name%.\nInvoice: %invoice_number%\nJumlah: %payment%\nBerlaku sampai: %expires_at%.\nBuka %dashboard_link% untuk konfirmasi.",
-  payment_received: "Pembayaran dari %customer_name% berhasil diterima.\nInvoice: %invoice_number%\nJumlah: %payment%\nMetode: %payment_method%.",
-  extension_requested: "%customer_name% mengajukan perpanjangan sewa kamar %room_name% selama %months% bulan.\nInvoice: %invoice_number%\nJumlah: %payment%.\nBuka %dashboard_link% untuk memeriksa.",
+export const defaultNotificationTemplates: Record<NotificationAudience, Record<NotificationTemplateKey, { header: string; content: string }>> = {
+  customer: {
+    invoice_created: { header: "INVOICE BARU", content: "Halo %customer_name%,\nInvoice %invoice_number% sebesar %payment% telah dibuat.\nJatuh tempo: %due_date%.\nBuka %dashboard_link% untuk melanjutkan pembayaran." },
+    invoice_due: { header: "PENGINGAT TAGIHAN", content: "Halo %customer_name%,\nInvoice %invoice_number% sebesar %payment% akan jatuh tempo pada %due_date%.\nPengingat H-%days_before_due%." },
+    cash_requested: { header: "", content: "" },
+    payment_received: { header: "", content: "" },
+    extension_requested: { header: "", content: "" },
+  },
+  owner: {
+    invoice_created: { header: "", content: "" },
+    invoice_due: { header: "", content: "" },
+    cash_requested: { header: "REQUEST PEMBAYARAN CASH", content: "Permintaan pembayaran cash dari %customer_name%.\nInvoice: %invoice_number%\nJumlah: %payment%\nBerlaku sampai: %expires_at%.\nBuka %dashboard_link% untuk konfirmasi." },
+    payment_received: { header: "TRANSAKSI BERHASIL", content: "Pembayaran dari %customer_name% berhasil diterima.\nInvoice: %invoice_number%\nJumlah: %payment%\nMetode: %payment_method%." },
+    extension_requested: { header: "REQUEST PERPANJANGAN KAMAR", content: "%customer_name% mengajukan perpanjangan sewa kamar %room_name% selama %months% bulan.\nInvoice: %invoice_number%\nJumlah: %payment%.\nBuka %dashboard_link% untuk memeriksa." },
+  },
 };
 
-export const renderNotificationTemplate = async (event: NotificationTemplateKey, values: NotificationTemplateValues): Promise<string> => {
-  const template = await NotificationTemplate.findOne({ ownerId: "__global__", event, active: true }).sort({ updatedAt: -1 }).lean();
-  const content = template?.content || defaultNotificationTemplates[event];
-  return content.replace(/%([a-z_]+)%/g, (_match, key: string) => String(values[key] ?? ""));
+const defaultAudienceForEvent: Record<NotificationTemplateKey, NotificationAudience> = {
+  invoice_created: "customer", invoice_due: "customer", cash_requested: "owner", payment_received: "owner", extension_requested: "owner",
+};
+
+export const renderNotificationTemplate = async (event: NotificationTemplateKey, values: NotificationTemplateValues, audience = defaultAudienceForEvent[event]): Promise<string> => {
+  const fallback = defaultNotificationTemplates[audience][event];
+  const template = await NotificationTemplate.findOne({ ownerId: "__global__", audience, event, active: true }).sort({ updatedAt: -1 }).lean();
+  const content = template?.content || fallback.content;
+  const header = template?.header || fallback.header;
+  const rendered = content.replace(/%([a-z_]+)%/g, (_match, key: string) => String(values[key] ?? ""));
+  return header ? `${header}\n\n${rendered}` : rendered;
 };
 
 export type NotificationEvent =

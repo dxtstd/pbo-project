@@ -9,7 +9,7 @@ type Owner = { ownerId: string; username: string; firstname: string; lastname: s
 type Content = { siteName: string; heroTitle: string; heroDescription: string; facilitiesTitle: string; facilitiesDescription: string; contactTitle: string; contactDescription: string; location: string; whatsapp: string };
 type Recipient = { id: string; label: string; phone: string };
 type RecipientData = { status: { status?: string; pairedNumber?: string }; owners: Recipient[]; customers: Recipient[] };
-type NotificationTemplate = { event: string; content: string };
+type NotificationTemplate = { audience: "owner" | "customer"; event: string; header: string; content: string };
 const emptyContent: Content = { siteName: "", heroTitle: "", heroDescription: "", facilitiesTitle: "", facilitiesDescription: "", contactTitle: "", contactDescription: "", location: "", whatsapp: "" };
 const emptyOwner = { username: "", firstname: "", lastname: "", email: "", phoneNumber: "", password: "" };
 
@@ -100,7 +100,7 @@ export function AdminDashboard() {
     const response = await apiFetch(`${API_URL}/admin/notification/templates`, {
       method: "PUT",
       headers: { ...authHeaders(), "content-type": "application/json" },
-      body: JSON.stringify({ templates: Object.fromEntries(notificationTemplates.map((template) => [template.event, template.content])) }),
+      body: JSON.stringify({ templates: Object.fromEntries(notificationTemplates.map((template) => [`${template.audience}:${template.event}`, { header: template.header, content: template.content }])) }),
     });
     setMessage(response.ok ? "Template notifikasi berhasil disimpan." : "Template notifikasi gagal disimpan.");
   };
@@ -137,7 +137,7 @@ export function AdminDashboard() {
           <h2 className="text-xl font-bold">Template pesan otomatis</h2>
           <p className="mt-1 text-sm text-[#765e52]">Atur pesan untuk invoice pertama, H-7/jatuh tempo, cash, pembayaran berhasil, dan permintaan perpanjangan kamar.</p>
           <p className="mt-2 rounded-lg bg-[#f8eee7] p-3 text-xs text-[#765e52]">Placeholder: %customer_name% %owner_name% %payment% %invoice_number% %due_date% %days_before_due% %expires_at% %payment_method% %room_name% %months% %dashboard_link%</p>
-          <div className="mt-4 grid gap-4">{notificationTemplates.map((template) => <label key={template.event} className="text-sm font-semibold">{({ invoice_created: "Invoice pertama", invoice_due: "H-7 / jatuh tempo", cash_requested: "Request cash", payment_received: "Transaksi berhasil", extension_requested: "Request perpanjangan kamar" } as Record<string, string>)[template.event] || template.event}<textarea rows={4} value={template.content} onChange={(event) => setNotificationTemplates(notificationTemplates.map((item) => item.event === template.event ? { ...item, content: event.target.value } : item))} className="mt-1 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2 font-normal" /></label>)}</div>
+          <div className="mt-4 grid gap-5 md:grid-cols-2">{(["customer", "owner"] as const).map((audience) => <div key={audience} className="rounded-xl border border-[#d7b9a9] p-4"><h3 className="text-lg font-bold">{audience === "customer" ? "Template Customer" : "Template Owner"}</h3><div className="mt-3 grid gap-4">{notificationTemplates.filter((template) => template.audience === audience).map((template) => <div key={`${template.audience}-${template.event}`}><label className="text-sm font-semibold">{({ invoice_created: "Invoice pertama", invoice_due: "H-7 / jatuh tempo", cash_requested: "Request cash", payment_received: "Transaksi berhasil", extension_requested: "Request perpanjangan kamar" } as Record<string, string>)[template.event] || template.event}<input value={template.header} placeholder="Header pesan" onChange={(event) => setNotificationTemplates(notificationTemplates.map((item) => item.audience === template.audience && item.event === template.event ? { ...item, header: event.target.value } : item))} className="mt-1 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2 font-normal" /><textarea rows={4} value={template.content} onChange={(event) => setNotificationTemplates(notificationTemplates.map((item) => item.audience === template.audience && item.event === template.event ? { ...item, content: event.target.value } : item))} className="mt-1 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2 font-normal" /></label></div>)}</div></div>)}</div>
           <button onClick={() => void saveNotificationTemplates()} className="mt-4 rounded-lg bg-[#694536] px-4 py-2 font-semibold text-white">Simpan template notifikasi</button>
         </section>
 

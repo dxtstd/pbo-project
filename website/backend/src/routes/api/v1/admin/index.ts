@@ -11,7 +11,7 @@ import { requireAuth, isAdmin } from "../../../../middlewares/auth";
 import { isValidPhoneNumber, normalizePhoneNumber } from "../../../../utils/phone";
 import { nextOwnerId } from "../../../../utils/identifiers";
 import { config } from "../../../../config/env";
-import { defaultNotificationTemplates, type NotificationTemplateKey } from "../../../../services/notification";
+import { defaultNotificationTemplates, type NotificationAudience, type NotificationTemplateKey } from "../../../../services/notification";
 
 const admin = Router();
 const RESET_CONFIRMATION = "RESET-ALL";
@@ -61,24 +61,39 @@ admin.put("/site-content", async (req, res) => {
 
 admin.get("/notification/templates", async (_req, res) => {
   const saved = await NotificationTemplate.find({ ownerId: "__global__" }).lean();
-  const templates = Object.entries(defaultNotificationTemplates).map(([event, fallback]) => ({
-    event,
-    content: saved.find((item) => item.event === event)?.content || fallback,
-  }));
+  const eventsByAudience: Record<NotificationAudience, NotificationTemplateKey[]> = {
+    customer: ["invoice_created", "invoice_due"],
+    owner: ["cash_requested", "payment_received", "extension_requested"],
+  };
+  const templates = (["customer", "owner"] as NotificationAudience[]).flatMap((audience) =>
+    eventsByAudience[audience].map((event) => {
+      const fallback = defaultNotificationTemplates[audience][event];
+      const item = saved.find((candidate) => candidate.audience === audience && candidate.event === event);
+      return { audience, event, header: item?.header ?? fallback.header, content: item?.content ?? fallback.content };
+    }),
+  );
   return res.json({ templates });
 });
 
 admin.put("/notification/templates", async (req, res) => {
   const templates = req.body?.templates;
   if (!templates || typeof templates !== "object") return res.status(400).json({ message: "Format template tidak valid" });
-  for (const event of Object.keys(defaultNotificationTemplates) as NotificationTemplateKey[]) {
-    const content = templates[event];
-    if (typeof content !== "string" || !content.trim()) return res.status(400).json({ message: `Template ${event} wajib diisi` });
-    await NotificationTemplate.findOneAndUpdate(
-      { ownerId: "__global__", event },
-      { $set: { ownerId: "__global__", event, name: event, content: content.trim(), active: true } },
-      { upsert: true, runValidators: true },
-    );
+  const eventsByAudience: Record<NotificationAudience, NotificationTemplateKey[]> = {
+    customer: ["invoice_created", "invoice_due"],
+    owner: ["cash_requested", "payment_received", "extension_requested"],
+  };
+  for (const audience of ["customer", "owner"] as NotificationAudience[]) {
+    for (const event of eventsByAudience[audience]) {
+      const value = templates[`${audience}:${event}`];
+      if (!value || typeof value.header !== "string" || typeof value.content !== "string" || !value.content.trim()) {
+        return res.status(400).json({ message: `Template ${audience}:${event} wajib diisi` });
+      }
+      await NotificationTemplate.findOneAndUpdate(
+        { ownerId: "__global__", audience, event },
+        { $set: { ownerId: "__global__", audience, event, name: event, header: value.header.trim(), content: value.content.trim(), active: true } },
+        { upsert: true, runValidators: true },
+      );
+    }
   }
   return res.json({ message: "Template notifikasi berhasil disimpan" });
 });
