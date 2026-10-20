@@ -16,7 +16,7 @@ export const createApp = (): express.Express => {
     const startedAt = process.hrtime.bigint();
     res.on("finish", () => {
       const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
-      logger.info({
+      const logData = {
         request: {
           method: req.method,
           url: req.originalUrl,
@@ -25,7 +25,12 @@ export const createApp = (): express.Express => {
           userId: req.user?.id,
           role: req.user?.role,
         },
-      }, "HTTP request completed");
+      };
+      if (req.path === "/health") {
+        logger.debug(logData, "HTTP request completed");
+      } else {
+        logger.info(logData, "HTTP request completed");
+      }
     });
     next();
   });

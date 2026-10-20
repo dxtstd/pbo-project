@@ -127,36 +127,47 @@ const sendEvent = async (event: Record<string, unknown>): Promise<void> => {
     throw new Error(`WhatsApp is not connected (status: ${connectionStatus}, state: ${zapo.getState()})`);
   }
 
-  const message = typeof event.message === "string" && event.message
-    ? event.message
-    : event.type === "invoice_created"
-    ? [
-        `Halo ${event.customerName},`,
-        `invoice ${event.invoiceNumber} sebesar Rp${event.amount} telah dibuat.`,
-        `Jatuh tempo pada ${event.dueDate}. Silakan buka dashboard untuk memilih metode pembayaran.`,
-      ].join("\n")
-    : event.type === "invoice_due"
-    ? [
-        `Halo ${event.customerName},`,
-        `tagihan ${event.invoiceNumber} sebesar Rp${event.amount} akan jatuh tempo pada ${event.dueDate}.`,
-        `Ini adalah pengingat H-${event.daysBeforeDue}.`,
-      ].join("\n")
-    : event.type === "cash_requested"
-    ? [
-        `Permintaan pembayaran cash dari ${event.customerName}.`,
-        `Invoice: ${event.invoiceNumber || "-"}`,
-        `Jumlah: Rp${event.amount}`,
-        `Berlaku sampai: ${event.expiresAt}`,
-        "Silakan buka dashboard owner untuk mengonfirmasi atau menolak.",
-      ].join("\n")
-    : event.type === "extension_requested"
-    ? `Permintaan perpanjangan sewa dari ${event.customerName}.`
-    : [
-        `Pembayaran diterima dari ${event.customerName}.`,
-        `Invoice: ${event.invoiceNumber || "-"}`,
-        `Jumlah: Rp${event.amount}`,
-        `Metode: ${event.paymentMethod}`,
-      ].join("\n");
+  let message = typeof event.message === "string" ? event.message.trim() : "";
+  if (!message) {
+    switch (event.type) {
+      case "invoice_created":
+        message = [
+          `Halo ${event.customerName},`,
+          `invoice ${event.invoiceNumber} sebesar Rp${event.amount} telah dibuat.`,
+          `Jatuh tempo pada ${event.dueDate}. Silakan buka dashboard untuk memilih metode pembayaran.`,
+        ].join("\n");
+        break;
+      case "invoice_due":
+        message = [
+          `Halo ${event.customerName},`,
+          `tagihan ${event.invoiceNumber} sebesar Rp${event.amount} akan jatuh tempo pada ${event.dueDate}.`,
+          `Ini adalah pengingat H-${event.daysBeforeDue}.`,
+        ].join("\n");
+        break;
+      case "cash_requested":
+        message = [
+          `Permintaan pembayaran cash dari ${event.customerName}.`,
+          `Invoice: ${event.invoiceNumber || "-"}`,
+          `Jumlah: Rp${event.amount}`,
+          `Berlaku sampai: ${event.expiresAt}`,
+          "Silakan buka dashboard owner untuk mengonfirmasi atau menolak.",
+        ].join("\n");
+        break;
+      case "extension_requested":
+        message = `Permintaan perpanjangan sewa dari ${event.customerName}.`;
+        break;
+      case "payment_received":
+        message = [
+          `Pembayaran diterima dari ${event.customerName}.`,
+          `Invoice: ${event.invoiceNumber || "-"}`,
+          `Jumlah: Rp${event.amount}`,
+          `Metode: ${event.paymentMethod}`,
+        ].join("\n");
+        break;
+      default:
+        throw new Error(`Unsupported notification event type: ${String(event.type)}`);
+    }
+  }
 
   logger.info({
     deliveryId: event.deliveryId,
@@ -217,12 +228,17 @@ const sendTestMessage = async (body: string): Promise<void> => {
 const server = createServer((request, response) => {
   const startedAt = process.hrtime.bigint();
   response.on("finish", () => {
-    logger.info({
+    const logData = {
       method: request.method,
       url: request.url,
       statusCode: response.statusCode,
       durationMs: Number((Number(process.hrtime.bigint() - startedAt) / 1_000_000).toFixed(2)),
-    }, "Notification HTTP request completed");
+    };
+    if (request.url === "/health") {
+      logger.debug(logData, "Notification HTTP request completed");
+    } else {
+      logger.info(logData, "Notification HTTP request completed");
+    }
   });
   if (request.url === "/event" && request.method === "POST") {
     let body = "";
