@@ -35,6 +35,13 @@ export function OwnerCustomers() {
   const remove = async (customerId: string) => {
     const ownerId = localStorage.getItem("userId");
     if (!ownerId || !window.confirm("Anda yakin ingin menghapus customer ini? Riwayat invoice akan tetap disimpan.")) return;
+    const room = data.rooms.find((item) => item.customerId === customerId);
+    const hasActiveRental = data.invoices.some((item) => {
+      if (item.customerId !== customerId || item.status !== "paid") return false;
+      const endDate = item.periodEndDate || item.dueDate;
+      return new Date(endDate).getTime() > Date.now();
+    });
+    if (room && hasActiveRental && !window.confirm("Customer ini masih memiliki durasi sewa aktif. Menghapusnya akan mengosongkan kamar dan mengakhiri penempatan customer. Lanjutkan?")) return;
     try { await deleteCustomer(ownerId, customerId); setMessage("Customer berhasil dihapus."); await refresh(); } catch (error) { setMessage(error instanceof Error ? error.message : "Customer gagal dihapus."); }
   };
   return <>

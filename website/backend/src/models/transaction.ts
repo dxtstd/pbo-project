@@ -15,6 +15,8 @@ export interface ITransaction extends Document {
   status: 'pending' | 'settlement' | 'capture' | 'deny' | 'cancel' | 'expire' | 'cash_pending' | 'confirmed';
   midtransOrderId?: string;
   expiresAt?: Date;
+  paymentActions?: { name: string; url: string }[];
+  vaNumbers?: { bank: string; va_number: string }[];
 }
 
 const TransactionSchema: Schema = new Schema({
@@ -28,6 +30,8 @@ const TransactionSchema: Schema = new Schema({
   status: { type: String, required: true, enum: ['pending', 'settlement', 'capture', 'deny', 'cancel', 'expire', 'cash_pending', 'confirmed'], default: 'pending' },
   midtransOrderId: { type: String, index: true },
   expiresAt: { type: Date, required: false },
+  paymentActions: { type: [{ name: String, url: String }], required: false },
+  vaNumbers: { type: [{ bank: String, va_number: String }], required: false },
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

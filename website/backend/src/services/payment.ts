@@ -58,8 +58,15 @@ export class PaymentService {
       totalAmount: invoice.amount,
       status: "pending",
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      paymentActions: charge.actions,
+      vaNumbers: charge.vaNumbers,
     });
-    return charge;
+    return {
+      ...charge,
+      transactionId: orderId,
+      status: "pending" as const,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    };
   }
 
   public async processMidtransCallback(callback: MidtransCharge): Promise<void> {

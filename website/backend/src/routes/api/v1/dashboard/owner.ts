@@ -178,6 +178,10 @@ ownerDashboard.delete("/:ownerId/customers/:customerId", async (req, res) => {
     { invoiceNumber: invoice.invoiceNumber },
     { $set: { customerName: invoice.customerName || `${customer.firstname} ${customer.lastname}`.trim(), roomName: invoice.roomName || roomNames.get(invoice.roomId) || invoice.roomId } },
   )));
+  await Room.updateMany(
+    { customerId: req.params.customerId, ownerId: req.params.ownerId },
+    { $set: { customerId: null, isOccupied: false }, $unset: { rentalStartDate: 1, monthlyDueDay: 1 } },
+  );
   const deleted = await Customer.deleteOne({ customerId: req.params.customerId, ownerId: req.params.ownerId });
   if (!deleted.deletedCount) return res.status(404).json({ message: "Customer not found" });
   return res.status(204).send();
