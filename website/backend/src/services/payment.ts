@@ -5,6 +5,7 @@ import Transaction, { type ITransaction } from "../models/transaction";
 import Room from "../models/room";
 import Owner from "../models/owner";
 import { isNotificationCategoryEnabled, publishCashRequested, publishPaymentReceived, renderNotificationTemplate } from "./notification";
+import logger from "../utils/logger";
 import {
   isSuccessfulMidtransStatus,
   type MidtransCharge,
@@ -30,6 +31,14 @@ export class PaymentService {
       status: "cash_pending",
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
+    logger.info({
+      transactionId: transaction.transactionId,
+      invoiceNumber: invoice.invoiceNumber,
+      customerId,
+      roomId: invoice.roomId,
+      amount: invoice.amount,
+      paymentMethod: "Cash",
+    }, "Cash payment requested");
     const [customer, room] = await Promise.all([
       Customer.findOne({ customerId: invoice.customerId }).select("firstname lastname").lean(),
       Room.findOne({ roomId: invoice.roomId }).select("ownerId").lean(),
@@ -73,6 +82,7 @@ export class PaymentService {
       customerPhone: customer.phoneNumber,
       paymentType,
     });
+    logger.info({ orderId, invoiceNumber: invoice.invoiceNumber, customerId, amount: invoice.amount, paymentType }, "Online payment charge created");
     await Transaction.create({
       transactionId: orderId,
       midtransOrderId: orderId,
@@ -97,6 +107,7 @@ export class PaymentService {
 
   public async processMidtransCallback(callback: MidtransCharge): Promise<void> {
     if (!this.gateway.verifyCallback(callback)) throw new Error("Invalid Midtrans signature");
+    logger.info({ orderId: callback.order_id, transactionStatus: callback.transaction_status }, "Midtrans payment callback received");
     const transaction = await Transaction.findOneAndUpdate(
       { midtransOrderId: callback.order_id, status: { $nin: ["settlement", "capture", "confirmed"] } },
       { status: callback.transaction_status },
@@ -105,6 +116,7 @@ export class PaymentService {
     if (transaction && isSuccessfulMidtransStatus(callback.transaction_status)) {
       await Invoice.updateOne({ invoiceNumber: transaction.invoiceNumber }, { status: "paid" });
       await this.publishPaymentReceived(transaction);
+      logger.info({ transactionId: transaction.transactionId, invoiceNumber: transaction.invoiceNumber }, "Online payment marked as paid");
     } else if (transaction && ["expire", "cancel", "deny"].includes(callback.transaction_status)) {
       await Invoice.updateOne({ invoiceNumber: transaction.invoiceNumber, status: "pending" }, { status: "unpaid" });
     }
@@ -123,6 +135,7 @@ export class PaymentService {
     if (!transaction) throw new Error("Cash payment not found or already confirmed");
     await Invoice.updateOne({ invoiceNumber: transaction.invoiceNumber }, { status: "paid" });
     await this.publishPaymentReceived(transaction);
+    logger.info({ transactionId: transaction.transactionId, invoiceNumber: transaction.invoiceNumber, ownerId }, "Cash payment confirmed");
     return { transactionId: transaction.transactionId, status: transaction.status };
   }
 
@@ -134,7 +147,7 @@ export class PaymentService {
     const owner = room?.ownerId ? await Owner.findOne({ ownerId: room.ownerId }).lean() : undefined;
     const ownerPhone = owner?.notificationPhone || owner?.phoneNumber;
     if (!customer || !owner || !ownerPhone) {
-      console.error(`Cannot notify payment ${transaction.transactionId}: customer, owner, or owner phone not found`);
+      logger.warn({ transactionId: transaction.transactionId, customerId: transaction.customerId, roomId: transaction.roomId }, "Payment notification skipped because recipient data is unavailable");
       return;
     }
     const message = await renderNotificationTemplate("payment_received", {

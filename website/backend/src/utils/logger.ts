@@ -1,11 +1,17 @@
-import pino from 'pino';
-import pretty from 'pino-pretty';
+import pino from "pino";
+import pretty from "pino-pretty";
 
-export default pino(
+const logger = pino(
   {
-    level: process.env.LOG_LEVEL || 'debug',
+    level: process.env.LOG_LEVEL || "info",
+    base: undefined,
+    timestamp: pino.stdTimeFunctions.isoTime,
   },
   pretty({
     colorize: true,
+    translateTime: "SYS:standard",
+    ignore: "pid,hostname",
   }),
-) as pino.Logger;
+);
+
+export default logger;

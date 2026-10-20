@@ -3,6 +3,7 @@ import NotificationTemplate from "../models/notificationTemplate";
 import SiteContent from "../models/siteContent";
 import Owner from "../models/owner";
 import { config } from "../config/env";
+import logger from "../utils/logger";
 
 export type NotificationTemplateKey = "invoice_created" | "invoice_due" | "cash_requested" | "payment_received" | "extension_requested";
 export type NotificationAudience = "owner" | "customer";
@@ -123,25 +124,34 @@ class NotificationBridge {
 
     socket.once("open", () => {
       this.connecting = false;
+      logger.info({ websocketUrl }, "Notification bridge connected");
       this.flush();
     });
 
     socket.once("close", () => {
       this.connecting = false;
       this.socket = undefined;
+      logger.warn({ websocketUrl }, "Notification bridge disconnected");
       this.scheduleReconnect();
     });
 
     socket.once("error", () => {
+      logger.error({ websocketUrl }, "Notification bridge connection error");
       socket.close();
     });
   }
 
   publish(event: NotificationEvent): void {
+    logger.info({
+      eventType: event.type,
+      invoiceNumber: "invoiceNumber" in event ? event.invoiceNumber : undefined,
+      recipient: "recipientPhone" in event ? event.recipientPhone : ("customerPhone" in event ? event.customerPhone : event.ownerPhone),
+      queued: this.socket?.readyState !== WebSocket.OPEN,
+    }, "Notification event published");
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(event), (error) => {
         if (error) {
-          console.error(`Failed to send ${event.type} notification over WebSocket`, error);
+          logger.error({ err: error, eventType: event.type }, "Failed to send notification over WebSocket");
           this.pendingEvents.push(event);
           this.connect();
         }
@@ -156,13 +166,16 @@ class NotificationBridge {
     }).then((response) => {
       if (!response.ok) throw new Error(`Notification service returned ${response.status}`);
     }).catch((error: unknown) => {
-      console.error(`Failed to send ${event.type} notification over HTTP`, error);
+      logger.error({ err: error, eventType: event.type }, "Failed to send notification over HTTP");
       this.pendingEvents.push(event);
       this.connect();
     });
   }
 
   private flush(): void {
+    if (this.pendingEvents.length > 0) {
+      logger.info({ count: this.pendingEvents.length }, "Flushing queued notification events");
+    }
     while (this.pendingEvents.length > 0 && this.socket?.readyState === WebSocket.OPEN) {
       const event = this.pendingEvents.shift();
       if (event) this.socket.send(JSON.stringify(event));

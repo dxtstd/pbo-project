@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 import { config } from "../config/env";
+import logger from "../utils/logger";
 
 /** Roles recognized by the API authorization layer. */
 export type AuthRole = "admin" | "owner" | "customer";
@@ -34,6 +35,7 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
     ? req.headers.authorization.slice(7)
     : undefined;
   if (!token) {
+    logger.warn({ method: req.method, url: req.originalUrl }, "Authentication token missing");
     res.status(401).json({ message: "Authentication required" });
     return;
   }
@@ -45,7 +47,8 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
       config.jwtPublicKey ? { algorithms: ["RS256"] } : { algorithms: ["HS256"] },
     ) as AuthUser;
     next();
-  } catch {
+  } catch (error) {
+    logger.warn({ err: error, method: req.method, url: req.originalUrl }, "Authentication token rejected");
     res.status(401).json({ message: "Invalid or expired token" });
   }
 };

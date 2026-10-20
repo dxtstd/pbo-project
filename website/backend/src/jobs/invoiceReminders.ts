@@ -4,6 +4,7 @@ import Owner from "../models/owner";
 import Room from "../models/room";
 import { isNotificationCategoryEnabled, notificationBridge, renderNotificationTemplate } from "../services/notification";
 import { createNextInvoice } from "../services/invoice";
+import logger from "../utils/logger";
 
 const reminderDays = [7, 0];
 const sentReminderKeys = new Set<string>();
@@ -25,7 +26,7 @@ export const sendInvoiceReminders = async (): Promise<void> => {
 
     for (const invoice of invoices) {
       await createNextInvoice(invoice).catch((error) => {
-        console.error(`Failed to create next invoice for ${invoice.invoiceNumber}`, error);
+        logger.error({ err: error, invoiceNumber: invoice.invoiceNumber }, "Failed to create next invoice");
       });
       const reminderKey = `${invoice.invoiceNumber}:${daysBeforeDue}:${dueDate.toISOString().slice(0, 10)}`;
       if (sentReminderKeys.has(reminderKey)) continue;
@@ -39,7 +40,7 @@ export const sendInvoiceReminders = async (): Promise<void> => {
         : undefined;
 
       if (!customer || !owner || !(await isNotificationCategoryEnabled(owner.ownerId, "invoice_due"))) {
-        console.error(`Cannot notify invoice ${invoice.invoiceNumber}: customer or owner not found`);
+        logger.warn({ invoiceNumber: invoice.invoiceNumber, customerId: invoice.customerId, roomId: invoice.roomId }, "Invoice reminder skipped because recipient data is unavailable or disabled");
         continue;
       }
 
@@ -70,12 +71,12 @@ export const sendInvoiceReminders = async (): Promise<void> => {
 
 export const startInvoiceReminderJob = (): NodeJS.Timeout => {
   void sendInvoiceReminders().catch((error) => {
-    console.error("Failed to send initial invoice reminders", error);
+    logger.error({ err: error }, "Failed to send initial invoice reminders");
   });
 
   return setInterval(() => {
     void sendInvoiceReminders().catch((error) => {
-      console.error("Failed to send invoice reminders", error);
+      logger.error({ err: error }, "Failed to send invoice reminders");
     });
   }, 60 * 60 * 1000);
 };

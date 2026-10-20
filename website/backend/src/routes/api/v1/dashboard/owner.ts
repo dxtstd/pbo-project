@@ -10,6 +10,7 @@ import { generateInvoicePdf } from "../../../../services/invoicePdf";
 import { isValidPhoneNumber, normalizePhoneNumber } from "../../../../utils/phone";
 import { createInvoiceForPeriod } from "../../../../services/invoice";
 import { nextCustomerId } from "../../../../utils/identifiers";
+import logger from "../../../../utils/logger";
 
 const ownerDashboard = Router();
 const furnitureFee = 100000;
@@ -416,7 +417,7 @@ ownerDashboard.get("/:ownerId/invoices/:invoiceNumber/pdf", async (req, res) => 
     res.setHeader("content-disposition", `attachment; filename="${invoice.invoiceNumber}.pdf"`);
     return res.send(Buffer.from(pdf));
   } catch (error) {
-    console.error("Failed to generate owner invoice PDF", error);
+    logger.error({ err: error, invoiceNumber: req.params.invoiceNumber, ownerId: req.params.ownerId }, "Failed to generate owner invoice PDF");
     return res.status(500).json({ message: "Invoice PDF could not be generated" });
   }
 });

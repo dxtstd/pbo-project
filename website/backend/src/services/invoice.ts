@@ -2,6 +2,7 @@ import Customer from "../models/customer";
 import Invoice from "../models/invoice";
 import Room from "../models/room";
 import { isNotificationCategoryEnabled, publishInvoiceCreated, renderNotificationTemplate } from "./notification";
+import logger from "../utils/logger";
 
 const addMonths = (date: Date, months: number): Date => {
   const result = new Date(date);
@@ -63,6 +64,14 @@ export const createInvoiceForPeriod = async (input: {
     periodEndDate: endDate,
     periodMonths: input.months,
   });
+  logger.info({
+    invoiceNumber: invoice.invoiceNumber,
+    customerId: input.customerId,
+    roomId: input.roomId,
+    amount: invoice.amount,
+    months: input.months,
+    status: invoice.status,
+  }, "Invoice created");
   if (input.notifyCreated !== false && customer.phoneNumber && await isNotificationCategoryEnabled(room.ownerId, "invoice_created")) {
     const message = await renderNotificationTemplate("invoice_created", {
       customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
@@ -80,7 +89,7 @@ export const createInvoiceForPeriod = async (input: {
       message,
     });
   } else if (input.notifyCreated !== false) {
-    console.error(`Cannot notify invoice ${invoice.invoiceNumber}: customer phone not found`);
+    logger.warn({ invoiceNumber: invoice.invoiceNumber, customerId: input.customerId }, "Invoice notification skipped because customer phone or category is unavailable");
   }
   return invoice;
 };

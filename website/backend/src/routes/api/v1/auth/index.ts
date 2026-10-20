@@ -4,6 +4,7 @@ import Customer from "../../../../models/customer";
 import Owner from "../../../../models/owner";
 import { config } from "../../../../config/env";
 import { createToken, requireAuth } from "../../../../middlewares/auth";
+import logger from "../../../../utils/logger";
 
 const auth = Router();
 
@@ -30,7 +31,10 @@ const auth = Router();
  */
 auth.post("/login", async (req, res) => {
   const { username, password } = req.body as { username?: string; password?: string };
-  if (!username || !password) return res.status(400).json({ message: "Username and password are required" });
+  if (!username || !password) {
+    logger.warn({ username: username || undefined }, "Login rejected because credentials are incomplete");
+    return res.status(400).json({ message: "Username and password are required" });
+  }
 
   if (username === config.adminUsername && password === config.adminPassword) {
     const user = {
@@ -39,21 +43,25 @@ auth.post("/login", async (req, res) => {
       username: config.adminUsername,
       email: config.adminEmail,
     };
+    logger.info({ username, role: "admin" }, "Admin login successful");
     return res.json({ token: createToken(user), user });
   }
 
   const owner = await Owner.findOne({ $or: [{ username }, { email: username }] });
   if (owner && await bcrypt.compare(password, owner.password)) {
     const user = { id: owner.ownerId, role: "owner" as const, username: owner.username };
+    logger.info({ username, role: "owner", userId: owner.ownerId }, "Owner login successful");
     return res.json({ token: createToken(user), user });
   }
 
   const customer = await Customer.findOne({ username });
   if (customer && await bcrypt.compare(password, customer.password)) {
     const user = { id: customer.customerId, role: "customer" as const, username: customer.username };
+    logger.info({ username, role: "customer", userId: customer.customerId }, "Customer login successful");
     return res.json({ token: createToken(user), user });
   }
 
+  logger.warn({ username }, "Login rejected because credentials are invalid");
   return res.status(401).json({ message: "Invalid username or password" });
 });
 

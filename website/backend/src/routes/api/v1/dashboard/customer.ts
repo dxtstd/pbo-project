@@ -8,6 +8,7 @@ import { generateInvoicePdf } from "../../../../services/invoicePdf";
 import { createInvoiceForPeriod } from "../../../../services/invoice";
 import Owner from "../../../../models/owner";
 import { isNotificationCategoryEnabled, publishExtensionRequested, renderNotificationTemplate } from "../../../../services/notification";
+import logger from "../../../../utils/logger";
 
 const customerDashboard = Router();
 
@@ -229,7 +230,7 @@ customerDashboard.get("/:customerId/invoices/:invoiceNumber/pdf", async (req, re
     res.setHeader("content-disposition", `attachment; filename="${invoice.invoiceNumber}.pdf"`);
     return res.send(Buffer.from(pdf));
   } catch (error) {
-    console.error("Failed to generate customer invoice PDF", error);
+    logger.error({ err: error, invoiceNumber: req.params.invoiceNumber, customerId: req.params.customerId }, "Failed to generate customer invoice PDF");
     return res.status(500).json({ message: "Invoice PDF could not be generated" });
   }
 });
