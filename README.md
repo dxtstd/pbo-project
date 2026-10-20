@@ -54,8 +54,9 @@ Create a `.env` file in the repository root with a non-default JWT secret:
 
 ```env
 JWT_SECRET=replace-with-a-long-random-secret
-ADMIN_EMAIL=admin@example.com
+ADMIN_USERNAME=admin
 ADMIN_PASSWORD=replace-with-a-strong-admin-password
+ADMIN_EMAIL=admin@example.com
 ```
 
 Start the frontend, backend, notification service, Nginx reverse proxy, and
@@ -97,8 +98,14 @@ must target `/api/v1/payment/callback`. Online payments are marked paid only
 for Midtrans `settlement` or `capture` callbacks. Cash payments stay pending
 until an owner confirms them.
 
-The administrator email is configured with `ADMIN_EMAIL`. Set the actual
+The administrator username is configured with `ADMIN_USERNAME`. The profile
+shown in the admin dashboard uses `ADMIN_EMAIL`. Set the actual
 `ADMIN_PASSWORD` only in the local or deployment environment file; do not
 commit the password to the repository.
+
+The admin dashboard also provides a permanent "Reset semua data" action. It
+requires two confirmations and the exact text `RESET-ALL`, and removes all
+application records while leaving the environment-configured admin credentials
+available for login.
 
 MongoDB data is stored in the named `mongodb-data` volume.

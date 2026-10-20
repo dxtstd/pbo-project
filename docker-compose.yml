@@ -32,8 +32,9 @@ services:
       MONGO_URI: mongodb://mongodb:27017/kost_db
       NOTIFICATION_WS_URL: ws://notification:4000
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL must be set}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?ADMIN_USERNAME must be set}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?FRONTEND_ORIGIN must be set}
       MIDTRANS_ENVIRONMENT: ${MIDTRANS_ENVIRONMENT:-sandbox}

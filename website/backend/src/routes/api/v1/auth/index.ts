@@ -33,7 +33,12 @@ auth.post("/login", async (req, res) => {
   if (!username || !password) return res.status(400).json({ message: "Username and password are required" });
 
   if (username === config.adminUsername && password === config.adminPassword) {
-    const user = { id: config.adminUsername, role: "admin" as const, username: config.adminUsername };
+    const user = {
+      id: config.adminUsername,
+      role: "admin" as const,
+      username: config.adminUsername,
+      email: config.adminEmail,
+    };
     return res.json({ token: createToken(user), user });
   }
 
@@ -65,7 +70,14 @@ auth.post("/login", async (req, res) => {
 auth.get("/me", requireAuth, async (req, res) => {
   const user = req.user;
   if (!user) return res.status(401).json({ message: "Authentication required" });
-  if (user.role === "admin") return res.json({ user });
+  if (user.role === "admin") {
+    return res.json({
+      user: {
+        ...user,
+        email: config.adminEmail,
+      },
+    });
+  }
 
   const profile = user.role === "owner"
     ? await Owner.findOne({ ownerId: user.id }).select("-password").lean()

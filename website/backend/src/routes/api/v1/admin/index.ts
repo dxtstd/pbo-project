@@ -1,17 +1,44 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import Owner from "../../../../models/owner";
+import Customer from "../../../../models/customer";
+import Room from "../../../../models/room";
+import Invoice from "../../../../models/invoice";
+import Transaction from "../../../../models/transaction";
+import NotificationTemplate from "../../../../models/notificationTemplate";
 import SiteContent from "../../../../models/siteContent";
 import { requireAuth, isAdmin } from "../../../../middlewares/auth";
 import { isValidPhoneNumber, normalizePhoneNumber } from "../../../../utils/phone";
 import { nextOwnerId } from "../../../../utils/identifiers";
 
 const admin = Router();
+const RESET_CONFIRMATION = "RESET-ALL";
 
 admin.use(
   requireAuth,
   isAdmin,
 );
+
+admin.post("/reset", async (req, res) => {
+  const confirmation = typeof req.body?.confirmation === "string"
+    ? req.body.confirmation.trim()
+    : "";
+  if (confirmation !== RESET_CONFIRMATION) {
+    return res.status(400).json({ message: `Ketik ${RESET_CONFIRMATION} untuk menghapus seluruh data aplikasi` });
+  }
+
+  const results = await Promise.all([
+    Owner.deleteMany({}),
+    Customer.deleteMany({}),
+    Room.deleteMany({}),
+    Invoice.deleteMany({}),
+    Transaction.deleteMany({}),
+    NotificationTemplate.deleteMany({}),
+    SiteContent.deleteMany({}),
+  ]);
+  const deletedCount = results.reduce((total, result) => total + result.deletedCount, 0);
+  return res.json({ message: "Seluruh data aplikasi berhasil dihapus", deletedCount });
+});
 
 admin.get("/site-content", async (_req, res) => {
   const content = await SiteContent.findOne({ key: "landing" }).lean();

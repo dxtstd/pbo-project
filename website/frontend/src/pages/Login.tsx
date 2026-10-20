@@ -28,12 +28,16 @@ export const Login: React.FC = () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(formData),
       });
-      const result = await response.json() as { token?: string; user?: { id: string; role: 'owner' | 'customer' | 'admin' }; message?: string };
+      const result = await response.json() as {
+        token?: string;
+        user?: { id: string; role: 'owner' | 'customer' | 'admin'; username?: string; firstname?: string; lastname?: string; email?: string };
+        message?: string;
+      };
       if (!response.ok || !result.token || !result.user) {
         setError(result.message || 'Akun atau password salah.');
         return;
       }
-      login(result.token, { ...result.user, username: formData.username });
+      login(result.token, { ...result.user, username: result.user.username || formData.username });
       navigate(result.user.role === 'owner' ? '/dashboard/owner' : result.user.role === 'customer' ? '/dashboard/customer' : '/admin');
     } catch {
       setError('Tidak dapat terhubung ke server. Pastikan backend sedang berjalan.');
