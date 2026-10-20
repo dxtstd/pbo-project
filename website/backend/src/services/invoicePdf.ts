@@ -23,7 +23,10 @@ const escapeHtml = (value: string): string => value.replace(/[&<>"']/g, (charact
 }[character] || character));
 
 const getBrowser = (): Promise<Browser> => {
-  browserPromise ||= puppeteer.launch({ headless: true });
+  browserPromise ||= puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
   return browserPromise;
 };
 
