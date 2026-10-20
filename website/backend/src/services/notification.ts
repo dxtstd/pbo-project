@@ -148,28 +148,33 @@ class NotificationBridge {
       recipient: "recipientPhone" in event ? event.recipientPhone : ("customerPhone" in event ? event.customerPhone : event.ownerPhone),
       queued: this.socket?.readyState !== WebSocket.OPEN,
     }, "Notification event published");
-    if (this.socket?.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(event), (error) => {
-        if (error) {
-          logger.error({ err: error, eventType: event.type }, "Failed to send notification over WebSocket");
-          this.pendingEvents.push(event);
-          this.connect();
-        }
-      });
-      return;
-    }
+    void this.sendHttp(event).catch((error: unknown) => {
+      logger.error({ err: error, eventType: event.type }, "Failed to send notification over HTTP");
+      if (this.socket?.readyState === WebSocket.OPEN) {
+        this.socket.send(JSON.stringify(event), (socketError) => {
+          if (socketError) {
+            logger.error({ err: socketError, eventType: event.type }, "Failed to send notification over WebSocket fallback");
+            this.pendingEvents.push(event);
+          }
+        });
+      } else {
+        this.pendingEvents.push(event);
+        this.connect();
+      }
+    });
+  }
 
-    void fetch(`${config.notificationHttpUrl}/event`, {
+  private async sendHttp(event: NotificationEvent): Promise<void> {
+    const response = await fetch(`${config.notificationHttpUrl}/event`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(event),
-    }).then((response) => {
-      if (!response.ok) throw new Error(`Notification service returned ${response.status}`);
-    }).catch((error: unknown) => {
-      logger.error({ err: error, eventType: event.type }, "Failed to send notification over HTTP");
-      this.pendingEvents.push(event);
-      this.connect();
     });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new Error(`Notification service returned ${response.status}${detail ? `: ${detail.slice(0, 200)}` : ""}`);
+    }
+    logger.info({ eventType: event.type }, "Notification event delivered to notification service");
   }
 
   private flush(): void {
@@ -178,7 +183,12 @@ class NotificationBridge {
     }
     while (this.pendingEvents.length > 0 && this.socket?.readyState === WebSocket.OPEN) {
       const event = this.pendingEvents.shift();
-      if (event) this.socket.send(JSON.stringify(event));
+      if (event) {
+        void this.sendHttp(event).catch((error: unknown) => {
+          logger.error({ err: error, eventType: event.type }, "Failed to flush notification event");
+          this.pendingEvents.unshift(event);
+        });
+      }
     }
   }
 

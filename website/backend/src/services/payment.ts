@@ -62,6 +62,15 @@ export class PaymentService {
         expiresAt: transaction.expiresAt!.toISOString(),
         message,
       });
+    } else {
+      logger.warn({
+        invoiceNumber: invoice.invoiceNumber,
+        customerId,
+        ownerId: room?.ownerId,
+        hasCustomer: Boolean(customer),
+        hasOwner: Boolean(owner),
+        hasOwnerPhone: Boolean(ownerPhone),
+      }, "Cash request notification skipped");
     }
     return { transactionId: transaction.transactionId, status: transaction.status, expiresAt: transaction.expiresAt };
   }

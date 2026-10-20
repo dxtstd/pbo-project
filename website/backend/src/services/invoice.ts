@@ -72,7 +72,8 @@ export const createInvoiceForPeriod = async (input: {
     months: input.months,
     status: invoice.status,
   }, "Invoice created");
-  if (input.notifyCreated !== false && customer.phoneNumber && await isNotificationCategoryEnabled(room.ownerId, "invoice_created")) {
+  const invoiceNotificationEnabled = await isNotificationCategoryEnabled(room.ownerId, "invoice_created");
+  if (input.notifyCreated !== false && customer.phoneNumber && invoiceNotificationEnabled) {
     const message = await renderNotificationTemplate("invoice_created", {
       customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
       invoice_number: invoice.invoiceNumber,
@@ -89,7 +90,13 @@ export const createInvoiceForPeriod = async (input: {
       message,
     });
   } else if (input.notifyCreated !== false) {
-    logger.warn({ invoiceNumber: invoice.invoiceNumber, customerId: input.customerId }, "Invoice notification skipped because customer phone or category is unavailable");
+    logger.warn({
+      invoiceNumber: invoice.invoiceNumber,
+      customerId: input.customerId,
+      hasCustomerPhone: Boolean(customer.phoneNumber),
+      notificationEnabled: invoiceNotificationEnabled,
+      ownerId: room.ownerId,
+    }, "Invoice notification skipped");
   }
   return invoice;
 };
