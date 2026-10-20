@@ -231,17 +231,21 @@ class NotificationBridge {
 export const notificationBridge = new NotificationBridge();
 
 export const publishPaymentReceived = (event: Extract<NotificationEvent, { type: "payment_received" }>): void => {
+  event.type = "payment_received";
   notificationBridge.publish(event);
 };
 
 export const publishInvoiceCreated = (event: Extract<NotificationEvent, { type: "invoice_created" }>): void => {
+  event.type = "invoice_created";
   notificationBridge.publish(event);
 };
 
 export const publishCashRequested = (event: Extract<NotificationEvent, { type: "cash_requested" }>): void => {
-  notificationBridge.publish(event);
+  event.type = "cash_requested";
+  notificationBridge.publish(event)
 };
 
 export const publishExtensionRequested = (event: Extract<NotificationEvent, { type: "extension_requested" }>): void => {
+  event.type = "extension_requested";
   notificationBridge.publish(event);
 };
