@@ -4,7 +4,7 @@ import Invoice from "../models/invoice";
 import Transaction, { type ITransaction } from "../models/transaction";
 import Room from "../models/room";
 import Owner from "../models/owner";
-import { publishCashRequested, publishPaymentReceived } from "./notification";
+import { publishCashRequested, publishPaymentReceived, renderNotificationTemplate } from "./notification";
 import {
   isSuccessfulMidtransStatus,
   type MidtransCharge,
@@ -36,6 +36,13 @@ export class PaymentService {
     ]);
     const owner = room?.ownerId ? await Owner.findOne({ ownerId: room.ownerId }).select("firstname lastname phoneNumber notificationPhone").lean() : undefined;
     if (customer && owner) {
+      const message = await renderNotificationTemplate("cash_requested", {
+        customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
+        invoice_number: invoice.invoiceNumber,
+        payment: `Rp${invoice.amount.toLocaleString("id-ID")}`,
+        expires_at: transaction.expiresAt!.toLocaleString("id-ID"),
+        dashboard_link: "/dashboard/owner",
+      });
       publishCashRequested({
         invoiceNumber: invoice.invoiceNumber,
         customerName: `${customer.firstname} ${customer.lastname}`.trim(),
@@ -43,6 +50,7 @@ export class PaymentService {
         ownerPhone: owner.notificationPhone || owner.phoneNumber,
         amount: invoice.amount,
         expiresAt: transaction.expiresAt!.toISOString(),
+        message,
       });
     }
     return { transactionId: transaction.transactionId, status: transaction.status, expiresAt: transaction.expiresAt };
@@ -128,6 +136,13 @@ export class PaymentService {
       console.error(`Cannot notify payment ${transaction.transactionId}: customer, owner, or owner phone not found`);
       return;
     }
+    const message = await renderNotificationTemplate("payment_received", {
+      customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
+      invoice_number: transaction.invoiceNumber,
+      payment: `Rp${transaction.totalAmount.toLocaleString("id-ID")}`,
+      payment_method: transaction.paymentMethod,
+      dashboard_link: "/dashboard/owner",
+    });
     publishPaymentReceived({
       type: "payment_received",
       invoiceNumber: transaction.invoiceNumber,
@@ -137,6 +152,7 @@ export class PaymentService {
       amount: transaction.totalAmount,
       paymentMethod: transaction.paymentMethod,
       paymentDate: transaction.paymentDate.toISOString(),
+      message,
     });
   }
 

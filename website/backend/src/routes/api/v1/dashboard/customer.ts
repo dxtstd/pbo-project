@@ -6,6 +6,8 @@ import Transaction from "../../../../models/transaction";
 import { config } from "../../../../config/env";
 import { generateInvoicePdf } from "../../../../services/invoicePdf";
 import { createInvoiceForPeriod } from "../../../../services/invoice";
+import Owner from "../../../../models/owner";
+import { publishExtensionRequested, renderNotificationTemplate } from "../../../../services/notification";
 
 const customerDashboard = Router();
 
@@ -79,7 +81,32 @@ customerDashboard.post("/:customerId/invoices/extend", async (req, res) => {
     startDate,
     months,
     status: "pending",
+    notifyCreated: false,
   });
+  const customer = await Customer.findOne({ customerId: req.params.customerId }).lean();
+  const owner = room.ownerId ? await Owner.findOne({ ownerId: room.ownerId }).lean() : undefined;
+  const ownerPhone = owner?.notificationPhone || owner?.phoneNumber;
+  if (customer && owner && ownerPhone) {
+    const message = await renderNotificationTemplate("extension_requested", {
+      customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
+      room_name: room.name,
+      invoice_number: invoice.invoiceNumber,
+      payment: `Rp${invoice.amount.toLocaleString("id-ID")}`,
+      months,
+      dashboard_link: "/dashboard/owner",
+    });
+    publishExtensionRequested({
+      customerName: `${customer.firstname} ${customer.lastname}`.trim(),
+      customerPhone: customer.phoneNumber,
+      ownerName: `${owner.firstname} ${owner.lastname}`.trim(),
+      ownerPhone,
+      roomName: room.name,
+      invoiceNumber: invoice.invoiceNumber,
+      amount: invoice.amount,
+      months,
+      message,
+    });
+  }
   return res.status(201).json({ invoice });
 });
 
@@ -141,7 +168,32 @@ customerDashboard.post("/:customerId/invoices/combined", async (req, res) => {
     startDate,
     months,
     status: "pending",
+    notifyCreated: false,
   });
+  const customer = await Customer.findOne({ customerId: req.params.customerId }).lean();
+  const owner = room.ownerId ? await Owner.findOne({ ownerId: room.ownerId }).lean() : undefined;
+  const ownerPhone = owner?.notificationPhone || owner?.phoneNumber;
+  if (customer && owner && ownerPhone) {
+    const message = await renderNotificationTemplate("extension_requested", {
+      customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
+      room_name: room.name,
+      invoice_number: invoice.invoiceNumber,
+      payment: `Rp${invoice.amount.toLocaleString("id-ID")}`,
+      months,
+      dashboard_link: "/dashboard/owner",
+    });
+    publishExtensionRequested({
+      customerName: `${customer.firstname} ${customer.lastname}`.trim(),
+      customerPhone: customer.phoneNumber,
+      ownerName: `${owner.firstname} ${owner.lastname}`.trim(),
+      ownerPhone,
+      roomName: room.name,
+      invoiceNumber: invoice.invoiceNumber,
+      amount: invoice.amount,
+      months,
+      message,
+    });
+  }
   return res.status(201).json({ invoice });
 });
 

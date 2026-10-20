@@ -89,13 +89,15 @@ const normalizePhone = (phone: string): string => {
  * @throws Error when the event has no recipient or WhatsApp delivery fails.
  */
 const sendEvent = async (event: Record<string, unknown>): Promise<void> => {
-  if (!["invoice_created", "invoice_due", "cash_requested", "payment_received"].includes(String(event.type))) return;
+  if (!["invoice_created", "invoice_due", "cash_requested", "payment_received", "extension_requested"].includes(String(event.type))) return;
 
   const recipientValue = ["invoice_created", "invoice_due"].includes(String(event.type)) ? event.customerPhone : event.ownerPhone;
   const recipient = typeof recipientValue === "string" ? recipientValue.trim() : "";
   if (!recipient) throw new Error("Notification event has no recipient phone number");
 
-  const message = event.type === "invoice_created"
+  const message = typeof event.message === "string" && event.message
+    ? event.message
+    : event.type === "invoice_created"
     ? [
         `Halo ${event.customerName},`,
         `invoice ${event.invoiceNumber} sebesar Rp${event.amount} telah dibuat.`,
@@ -115,6 +117,8 @@ const sendEvent = async (event: Record<string, unknown>): Promise<void> => {
         `Berlaku sampai: ${event.expiresAt}`,
         "Silakan buka dashboard owner untuk mengonfirmasi atau menolak.",
       ].join("\n")
+    : event.type === "extension_requested"
+    ? `Permintaan perpanjangan sewa dari ${event.customerName}.`
     : [
         `Pembayaran diterima dari ${event.customerName}.`,
         `Invoice: ${event.invoiceNumber || "-"}`,

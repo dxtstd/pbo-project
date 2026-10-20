@@ -2,7 +2,7 @@ import Customer from "../models/customer";
 import Invoice from "../models/invoice";
 import Owner from "../models/owner";
 import Room from "../models/room";
-import { notificationBridge } from "../services/notification";
+import { notificationBridge, renderNotificationTemplate } from "../services/notification";
 import { createNextInvoice } from "../services/invoice";
 
 const reminderDays = [7, 0];
@@ -43,6 +43,14 @@ export const sendInvoiceReminders = async (): Promise<void> => {
         continue;
       }
 
+      const message = await renderNotificationTemplate("invoice_due", {
+        customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
+        invoice_number: invoice.invoiceNumber,
+        payment: `Rp${invoice.amount.toLocaleString("id-ID")}`,
+        due_date: invoice.dueDate.toLocaleDateString("id-ID"),
+        days_before_due: daysBeforeDue,
+        dashboard_link: "/dashboard/customer/payment",
+      });
       notificationBridge.publish({
         type: "invoice_due",
         invoiceNumber: invoice.invoiceNumber,
@@ -53,6 +61,7 @@ export const sendInvoiceReminders = async (): Promise<void> => {
         amount: invoice.amount,
         dueDate: invoice.dueDate.toISOString().slice(0, 10),
         daysBeforeDue,
+        message,
       });
       sentReminderKeys.add(reminderKey);
     }

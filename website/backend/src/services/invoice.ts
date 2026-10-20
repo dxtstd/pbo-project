@@ -1,7 +1,7 @@
 import Customer from "../models/customer";
 import Invoice from "../models/invoice";
 import Room from "../models/room";
-import { publishInvoiceCreated } from "./notification";
+import { publishInvoiceCreated, renderNotificationTemplate } from "./notification";
 
 const addMonths = (date: Date, months: number): Date => {
   const result = new Date(date);
@@ -26,6 +26,7 @@ export const createInvoiceForPeriod = async (input: {
   startDate: Date;
   months: number;
   status?: "pending" | "unpaid";
+  notifyCreated?: boolean;
 }) => {
   if (!Number.isInteger(input.months) || input.months < 1 || input.months > 12) {
     throw new Error("Durasi invoice harus antara 1 sampai 12 bulan");
@@ -62,13 +63,21 @@ export const createInvoiceForPeriod = async (input: {
     periodEndDate: endDate,
     periodMonths: input.months,
   });
-  if (customer.phoneNumber) {
+  if (input.notifyCreated !== false && customer.phoneNumber) {
+    const message = await renderNotificationTemplate("invoice_created", {
+      customer_name: `${customer.firstname} ${customer.lastname}`.trim(),
+      invoice_number: invoice.invoiceNumber,
+      payment: `Rp${invoice.amount.toLocaleString("id-ID")}`,
+      due_date: invoice.dueDate.toLocaleDateString("id-ID"),
+      dashboard_link: "/dashboard/customer/payment",
+    });
     publishInvoiceCreated({
       invoiceNumber: invoice.invoiceNumber,
       customerName: `${customer.firstname} ${customer.lastname}`.trim(),
       customerPhone: customer.phoneNumber,
       amount: invoice.amount,
       dueDate: invoice.dueDate.toISOString().slice(0, 10),
+      message,
     });
   } else {
     console.error(`Cannot notify invoice ${invoice.invoiceNumber}: customer phone not found`);

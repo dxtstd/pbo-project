@@ -9,6 +9,7 @@ type Owner = { ownerId: string; username: string; firstname: string; lastname: s
 type Content = { siteName: string; heroTitle: string; heroDescription: string; facilitiesTitle: string; facilitiesDescription: string; contactTitle: string; contactDescription: string; location: string; whatsapp: string };
 type Recipient = { id: string; label: string; phone: string };
 type RecipientData = { status: { status?: string; pairedNumber?: string }; owners: Recipient[]; customers: Recipient[] };
+type NotificationTemplate = { event: string; content: string };
 const emptyContent: Content = { siteName: "", heroTitle: "", heroDescription: "", facilitiesTitle: "", facilitiesDescription: "", contactTitle: "", contactDescription: "", location: "", whatsapp: "" };
 const emptyOwner = { username: "", firstname: "", lastname: "", email: "", phoneNumber: "", password: "" };
 
@@ -27,17 +28,20 @@ export function AdminDashboard() {
   const [recipients, setRecipients] = useState<RecipientData>({ status: {}, owners: [], customers: [] });
   const [testRecipient, setTestRecipient] = useState("");
   const [testMessage, setTestMessage] = useState("Halo dari Kost Lorem Ipsum. Ini adalah pesan testing notifikasi WhatsApp.");
+  const [notificationTemplates, setNotificationTemplates] = useState<NotificationTemplate[]>([]);
 
   const load = useCallback(async () => {
-    const [ownerResponse, contentResponse, recipientResponse] = await Promise.all([
+    const [ownerResponse, contentResponse, recipientResponse, templateResponse] = await Promise.all([
       apiFetch(`${API_URL}/admin/owners`, { headers: authHeaders() }),
       apiFetch(`${API_URL}/admin/site-content`, { headers: authHeaders() }),
       apiFetch(`${API_URL}/admin/notification/recipients`, { headers: authHeaders() }),
+      apiFetch(`${API_URL}/admin/notification/templates`, { headers: authHeaders() }),
     ]);
-    if (!ownerResponse.ok || !contentResponse.ok || !recipientResponse.ok) { navigate("/login"); return; }
+    if (!ownerResponse.ok || !contentResponse.ok || !recipientResponse.ok || !templateResponse.ok) { navigate("/login"); return; }
     setOwners((await ownerResponse.json() as { owners: Owner[] }).owners);
     setContent((await contentResponse.json() as { content: Content }).content || emptyContent);
     setRecipients(await recipientResponse.json() as RecipientData);
+    setNotificationTemplates((await templateResponse.json() as { templates: NotificationTemplate[] }).templates);
   }, [navigate]);
 
   useEffect(() => {
@@ -92,6 +96,15 @@ export function AdminDashboard() {
     setMessage(response.ok ? "Notifikasi testing berhasil dikirim." : result.message || "Notifikasi testing gagal dikirim.");
   };
 
+  const saveNotificationTemplates = async () => {
+    const response = await apiFetch(`${API_URL}/admin/notification/templates`, {
+      method: "PUT",
+      headers: { ...authHeaders(), "content-type": "application/json" },
+      body: JSON.stringify({ templates: Object.fromEntries(notificationTemplates.map((template) => [template.event, template.content])) }),
+    });
+    setMessage(response.ok ? "Template notifikasi berhasil disimpan." : "Template notifikasi gagal disimpan.");
+  };
+
   const ownerFields = ["username", "firstname", "lastname", "email", "phoneNumber", "password"] as const;
   const contentFields = [["siteName", "Nama situs"], ["heroTitle", "Judul utama"], ["heroDescription", "Deskripsi utama"], ["facilitiesTitle", "Judul fasilitas"], ["facilitiesDescription", "Deskripsi fasilitas"], ["contactTitle", "Judul kontak"], ["contactDescription", "Deskripsi kontak"], ["location", "Lokasi"], ["whatsapp", "WhatsApp"]] as const;
   const adminUsername = adminUser?.username || "admin";
@@ -118,6 +131,14 @@ export function AdminDashboard() {
             <label className="text-sm font-semibold">Pesan<textarea rows={4} value={testMessage} onChange={(event) => setTestMessage(event.target.value)} className="mt-1 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2" /></label>
             <button onClick={() => void sendNotificationTest()} disabled={!testRecipient || !testMessage.trim()} className="rounded-lg bg-[#694536] px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Kirim pesan testing</button>
           </div>
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-[#d7b9a9] bg-[#fffaf5] p-5 sm:p-7">
+          <h2 className="text-xl font-bold">Template pesan otomatis</h2>
+          <p className="mt-1 text-sm text-[#765e52]">Atur pesan untuk invoice pertama, H-7/jatuh tempo, cash, pembayaran berhasil, dan permintaan perpanjangan kamar.</p>
+          <p className="mt-2 rounded-lg bg-[#f8eee7] p-3 text-xs text-[#765e52]">Placeholder: %customer_name% %owner_name% %payment% %invoice_number% %due_date% %days_before_due% %expires_at% %payment_method% %room_name% %months% %dashboard_link%</p>
+          <div className="mt-4 grid gap-4">{notificationTemplates.map((template) => <label key={template.event} className="text-sm font-semibold">{({ invoice_created: "Invoice pertama", invoice_due: "H-7 / jatuh tempo", cash_requested: "Request cash", payment_received: "Transaksi berhasil", extension_requested: "Request perpanjangan kamar" } as Record<string, string>)[template.event] || template.event}<textarea rows={4} value={template.content} onChange={(event) => setNotificationTemplates(notificationTemplates.map((item) => item.event === template.event ? { ...item, content: event.target.value } : item))} className="mt-1 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2 font-normal" /></label>)}</div>
+          <button onClick={() => void saveNotificationTemplates()} className="mt-4 rounded-lg bg-[#694536] px-4 py-2 font-semibold text-white">Simpan template notifikasi</button>
         </section>
 
         <section className="mt-6 rounded-2xl border border-[#d7b9a9] bg-[#fffaf5] p-5 sm:p-7"><h2 className="text-xl font-bold">CMS landing page</h2><p className="text-sm text-[#765e52]">Edit teks yang tampil di halaman depan.</p><div className="mt-5 grid gap-3 md:grid-cols-2">{contentFields.map(([field, label]) => <label key={field} className="text-sm font-semibold">{label}{field.toLowerCase().includes("description") ? <textarea rows={3} value={content[field]} onChange={(event) => setContent({ ...content, [field]: event.target.value })} className="mt-1 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2" /> : <input value={content[field]} onChange={(event) => setContent({ ...content, [field]: event.target.value })} className="mt-1 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2" />}</label>)}<button onClick={() => void saveContent()} className="rounded-lg bg-[#694536] px-4 py-2 font-semibold text-white md:col-span-2">Simpan konten landing</button></div></section>

@@ -11,6 +11,7 @@ import { requireAuth, isAdmin } from "../../../../middlewares/auth";
 import { isValidPhoneNumber, normalizePhoneNumber } from "../../../../utils/phone";
 import { nextOwnerId } from "../../../../utils/identifiers";
 import { config } from "../../../../config/env";
+import { defaultNotificationTemplates, type NotificationTemplateKey } from "../../../../services/notification";
 
 const admin = Router();
 const RESET_CONFIRMATION = "RESET-ALL";
@@ -56,6 +57,30 @@ admin.put("/site-content", async (req, res) => {
     { new: true, upsert: true, runValidators: true },
   ).lean();
   return res.json({ content });
+});
+
+admin.get("/notification/templates", async (_req, res) => {
+  const saved = await NotificationTemplate.find({ ownerId: "__global__" }).lean();
+  const templates = Object.entries(defaultNotificationTemplates).map(([event, fallback]) => ({
+    event,
+    content: saved.find((item) => item.event === event)?.content || fallback,
+  }));
+  return res.json({ templates });
+});
+
+admin.put("/notification/templates", async (req, res) => {
+  const templates = req.body?.templates;
+  if (!templates || typeof templates !== "object") return res.status(400).json({ message: "Format template tidak valid" });
+  for (const event of Object.keys(defaultNotificationTemplates) as NotificationTemplateKey[]) {
+    const content = templates[event];
+    if (typeof content !== "string" || !content.trim()) return res.status(400).json({ message: `Template ${event} wajib diisi` });
+    await NotificationTemplate.findOneAndUpdate(
+      { ownerId: "__global__", event },
+      { $set: { ownerId: "__global__", event, name: event, content: content.trim(), active: true } },
+      { upsert: true, runValidators: true },
+    );
+  }
+  return res.json({ message: "Template notifikasi berhasil disimpan" });
 });
 
 admin.get("/notification/recipients", async (_req, res) => {
