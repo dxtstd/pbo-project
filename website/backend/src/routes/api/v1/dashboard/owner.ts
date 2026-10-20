@@ -573,7 +573,7 @@ ownerDashboard.patch("/:ownerId/rooms/:roomId/customer", async (req, res) => {
   }
 
   const dueDate = getClampedDueDate(startDate.getFullYear(), startDate.getMonth(), dueDay);
-  const customer = await Customer.findOne({ customerId }).select("firstname lastname").lean();
+  const customer = await Customer.findOne({ customerId }).select("firstname lastname phoneNumber").lean();
   if (!customer) return res.status(404).json({ message: "Customer tidak ditemukan" });
   const invoice = await createInvoiceForPeriod({
     customerId,

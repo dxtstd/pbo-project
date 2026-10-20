@@ -3,6 +3,8 @@ import Customer from "../models/customer";
 import Invoice from "../models/invoice";
 import Transaction, { type ITransaction } from "../models/transaction";
 import Room from "../models/room";
+import Owner from "../models/owner";
+import { publishCashRequested } from "./notification";
 import {
   isSuccessfulMidtransStatus,
   type MidtransCharge,
@@ -28,6 +30,21 @@ export class PaymentService {
       status: "cash_pending",
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
+    const [customer, room] = await Promise.all([
+      Customer.findOne({ customerId: invoice.customerId }).select("firstname lastname").lean(),
+      Room.findOne({ roomId: invoice.roomId }).select("ownerId").lean(),
+    ]);
+    const owner = room?.ownerId ? await Owner.findOne({ ownerId: room.ownerId }).select("firstname lastname phoneNumber notificationPhone").lean() : undefined;
+    if (customer && owner) {
+      publishCashRequested({
+        invoiceNumber: invoice.invoiceNumber,
+        customerName: `${customer.firstname} ${customer.lastname}`.trim(),
+        ownerName: `${owner.firstname} ${owner.lastname}`.trim(),
+        ownerPhone: owner.notificationPhone || owner.phoneNumber,
+        amount: invoice.amount,
+        expiresAt: transaction.expiresAt!.toISOString(),
+      });
+    }
     return { transactionId: transaction.transactionId, status: transaction.status, expiresAt: transaction.expiresAt };
   }
 

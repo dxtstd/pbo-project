@@ -2,6 +2,14 @@ import WebSocket from "ws";
 
 export type NotificationEvent =
   | {
+      type: "invoice_created";
+      invoiceNumber: string;
+      customerName: string;
+      customerPhone: string;
+      amount: number;
+      dueDate: string;
+    }
+  | {
       type: "invoice_due";
       invoiceNumber: string;
       customerName: string;
@@ -11,6 +19,15 @@ export type NotificationEvent =
       amount: number;
       dueDate: string;
       daysBeforeDue: number;
+    }
+  | {
+      type: "cash_requested";
+      invoiceNumber?: string;
+      customerName: string;
+      ownerName: string;
+      ownerPhone: string;
+      amount: number;
+      expiresAt: string;
     }
   | {
       type: "payment_received";
@@ -84,5 +101,13 @@ class NotificationBridge {
 export const notificationBridge = new NotificationBridge();
 
 export const publishPaymentReceived = (event: Extract<NotificationEvent, { type: "payment_received" }>): void => {
+  notificationBridge.publish(event);
+};
+
+export const publishInvoiceCreated = (event: Extract<NotificationEvent, { type: "invoice_created" }>): void => {
+  notificationBridge.publish(event);
+};
+
+export const publishCashRequested = (event: Extract<NotificationEvent, { type: "cash_requested" }>): void => {
   notificationBridge.publish(event);
 };

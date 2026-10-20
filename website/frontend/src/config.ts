@@ -26,3 +26,12 @@ export const authHeaders = (): HeadersInit => {
   const token = localStorage.getItem("authToken");
   return token ? { authorization: `Bearer ${token}` } : {};
 };
+
+export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const response = await fetch(input, init);
+  if (response.status === 401) {
+    ["authToken", "userId", "username", "userRole", "firstname", "lastname", "email"].forEach((key) => localStorage.removeItem(key));
+    if (window.location.pathname !== "/login") window.location.replace("/login");
+  }
+  return response;
+};

@@ -48,7 +48,7 @@ h1{margin:0 0 8px;color:#694536} .muted{color:#765e52}
 };
 
 export const downloadInvoicePdf = async (url: string): Promise<void> => {
-  const response = await fetch(url, { headers: authHeaders() });
+  const response = await apiFetch(url, { headers: authHeaders() });
   if (!response.ok) {
     const result = await response.json().catch(() => ({})) as { message?: string };
     throw new Error(result.message || "Invoice PDF gagal diunduh");
@@ -61,4 +61,4 @@ export const downloadInvoicePdf = async (url: string): Promise<void> => {
   link.click();
   URL.revokeObjectURL(objectUrl);
 };
-import { authHeaders } from "../config";
+import { apiFetch, authHeaders } from "../config";

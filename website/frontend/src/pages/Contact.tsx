@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { ContactformData } from '../types';
+import { Toast } from '../components/Toast';
 
 export const Contact = function ({ title, description, location, whatsapp }: { title?: string; description?: string; location?: string; whatsapp?: string }): React.ReactElement {
   const [formData, setFormData] = useState<ContactformData>({
@@ -7,14 +8,16 @@ export const Contact = function ({ title, description, location, whatsapp }: { t
     whatsapp: '',
     message: '',
   });
+  const [message, setMessage] = useState('');
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     console.log('Contact data:', formData);
-    alert('Pesan berhasil dikirim.');
+    setMessage('Pesan berhasil dikirim.');
   };
 
   return (
+    <>
     <section id="contact" className="flex min-h-[calc(100dvh-76px)] scroll-mt-[76px] items-center justify-center px-4 py-12 sm:px-8 md:min-h-[calc(100dvh-88px)] md:scroll-mt-[88px] md:px-12 lg:px-16 xl:px-20">
       <div className="w-full max-w-5xl lg:max-w-4xl xl:max-w-5xl 2xl:max-w-6xl">
         <div className="text-center">
@@ -75,5 +78,7 @@ export const Contact = function ({ title, description, location, whatsapp }: { t
         </div>
       </div>
     </section>
+    {message && <Toast message={message} onClose={() => setMessage('')} />}
+    </>
   );
 };

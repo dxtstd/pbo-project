@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { useOutletContext } from "react-router-dom";
 import { createCustomer, deleteCustomer, updateCustomer } from "./api";
 import type { OwnerData } from "./types";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 
 type Context = { data: OwnerData; refresh: () => Promise<void>; setMessage: (message: string) => void };
 type CustomerForm = { customerId?: string; username: string; firstname: string; lastname: string; phoneNumber: string; password: string };
@@ -14,6 +15,7 @@ export function OwnerCustomers() {
   const [editing, setEditing] = useState<string>();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteRequest, setDeleteRequest] = useState<{ customerId: string; activeRental: boolean }>();
   const normalizePhone = (value: string) => value.replace(/\D/g, "").replace(/^0/, "62");
   const openForm = (customer?: OwnerData["customers"][number]) => {
     setEditing(customer?.customerId);
@@ -34,19 +36,26 @@ export function OwnerCustomers() {
   };
   const remove = async (customerId: string) => {
     const ownerId = localStorage.getItem("userId");
-    if (!ownerId || !window.confirm("Anda yakin ingin menghapus customer ini? Riwayat invoice akan tetap disimpan.")) return;
+    if (!ownerId) return;
     const room = data.rooms.find((item) => item.customerId === customerId);
     const hasActiveRental = data.invoices.some((item) => {
       if (item.customerId !== customerId || item.status !== "paid") return false;
       const endDate = item.periodEndDate || item.dueDate;
       return new Date(endDate).getTime() > Date.now();
     });
-    if (room && hasActiveRental && !window.confirm("Customer ini masih memiliki durasi sewa aktif. Menghapusnya akan mengosongkan kamar dan mengakhiri penempatan customer. Lanjutkan?")) return;
+    setDeleteRequest({ customerId, activeRental: Boolean(room && hasActiveRental) });
+  };
+  const confirmRemove = async () => {
+    const ownerId = localStorage.getItem("userId");
+    if (!ownerId || !deleteRequest) return;
+    const customerId = deleteRequest.customerId;
+    setDeleteRequest(undefined);
     try { await deleteCustomer(ownerId, customerId); setMessage("Customer berhasil dihapus."); await refresh(); } catch (error) { setMessage(error instanceof Error ? error.message : "Customer gagal dihapus."); }
   };
   return <>
     <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-2xl font-bold">Daftar customer</h2><p className="text-sm text-[#765e52]">Kelola data customer yang menyewa kost Anda.</p></div><button type="button" onClick={() => openForm()} className="rounded-lg bg-[#694536] px-4 py-2.5 text-sm font-semibold text-white">+ Tambah customer</button></div>
     <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.customers.map((customer) => <article key={customer.customerId} className="rounded-2xl border border-[#d7b9a9] bg-[#fffaf5] p-5"><p className="text-xs text-[#765e52]">{customer.customerId}</p><h3 className="mt-1 text-lg font-bold">{customer.firstname} {customer.lastname}</h3><p className="mt-2 text-sm text-[#765e52]">@{customer.username}</p><p className="text-sm text-[#765e52]">{customer.phoneNumber}</p><div className="mt-5 grid grid-cols-2 gap-2"><button type="button" onClick={() => openForm(customer)} className="rounded-lg bg-[#694536] py-2 text-sm font-semibold text-white">Edit</button><button type="button" onClick={() => void remove(customer.customerId)} className="rounded-lg border border-red-300 py-2 text-sm font-semibold text-red-700">Hapus</button></div></article>)}</div>
     {open && <div className="fixed inset-0 z-20 overflow-y-auto bg-[#3e2f28]/40 p-4"><div className="grid min-h-full place-items-center"><form onSubmit={(event) => void save(event)} className="w-full max-w-md rounded-2xl bg-[#fffaf5] p-5 shadow-xl"><div className="flex items-center justify-between"><h2 className="text-xl font-bold">{editing ? "Edit customer" : "Tambah customer"}</h2><button type="button" onClick={() => setOpen(false)} className="text-xl">×</button></div>{(["username", "firstname", "lastname"] as const).map((field) => <label key={field} className="mt-3 block text-sm font-semibold">{field === "username" ? "Username" : field === "firstname" ? "Nama depan" : "Nama belakang (opsional)"}<input required={field !== "lastname"} value={form[field]} onChange={(event) => setForm({ ...form, [field]: event.target.value })} className="mt-1 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2" /></label>)}<label className="mt-3 block text-sm font-semibold">Nomor WhatsApp<input required inputMode="tel" value={form.phoneNumber} onChange={(event) => setForm({ ...form, phoneNumber: event.target.value.replace(/[^\d+() -]/g, "") })} className="mt-1 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2" placeholder="08xxxxxxxxxx" /></label><label className="mt-3 block text-sm font-semibold">Password {editing && <span className="font-normal text-[#765e52]">(kosongkan jika tidak berubah)</span>}<input required={!editing} type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} className="mt-1 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2" /></label><button disabled={saving} className="mt-6 w-full rounded-lg bg-[#694536] py-2.5 font-semibold text-white disabled:opacity-60">{saving ? "Menyimpan..." : "Simpan customer"}</button></form></div></div>}
+    {deleteRequest && <ConfirmDialog title={deleteRequest.activeRental ? "Customer masih memiliki sewa aktif" : "Hapus customer?"} message={deleteRequest.activeRental ? "Customer ini masih memiliki durasi sewa aktif. Jika dilanjutkan, kamar akan dikosongkan dan penempatan customer diakhiri. Riwayat invoice tetap disimpan." : "Customer akan dihapus secara permanen. Riwayat invoice tetap disimpan."} confirmLabel="Hapus customer" onClose={() => setDeleteRequest(undefined)} onConfirm={() => void confirmRemove()} />}
   </>;
 }

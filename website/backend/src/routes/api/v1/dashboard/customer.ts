@@ -60,7 +60,7 @@ customerDashboard.post("/:customerId/invoices/extend", async (req, res) => {
   const unpaidInvoice = await Invoice.exists({
     customerId: req.params.customerId,
     roomId: room.roomId,
-    status: { $in: ["unpaid", "overdue"] },
+    status: { $nin: ["paid", "cancelled"] },
   });
   if (unpaidInvoice) return res.status(409).json({ message: "Selesaikan invoice aktif terlebih dahulu sebelum mengajukan perpanjangan" });
   const latestInvoice = await Invoice.findOne({

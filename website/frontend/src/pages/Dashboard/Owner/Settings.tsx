@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import QRCode from "qrcode";
-import { API_URL, authHeaders } from "../../../config";
+import { API_URL, apiFetch, authHeaders } from "../../../config";
 import type { OwnerData } from "./types";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 
 type Context = { data: OwnerData; refresh: () => Promise<void>; setMessage: (message: string) => void };
 type NotificationStatus = { status: string; qr?: string; pairedNumber?: string; ownerPhone?: string; notificationPhone?: string };
@@ -13,12 +14,13 @@ export function OwnerSettings() {
   const [loading, setLoading] = useState(true);
   const [testPhone, setTestPhone] = useState("");
   const [notificationPhone, setNotificationPhone] = useState("");
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
   const qrCanvas = useRef<HTMLCanvasElement>(null);
   const ownerId = localStorage.getItem("userId");
 
   useEffect(() => {
     const checkStatus = () => {
-      void fetch(`${API_URL}/dashboard/owner/${ownerId}/notification`, { headers: authHeaders() })
+      void apiFetch(`${API_URL}/dashboard/owner/${ownerId}/notification`, { headers: authHeaders() })
         .then(async (response) => {
           if (response.ok) {
             const nextStatus = await response.json() as NotificationStatus;
@@ -53,7 +55,7 @@ export function OwnerSettings() {
   const startPairing = async () => {
     if (!ownerId) return;
     setLoading(true);
-    const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/notification/pair`, { method: "POST", headers: authHeaders() });
+    const response = await apiFetch(`${API_URL}/dashboard/owner/${ownerId}/notification/pair`, { method: "POST", headers: authHeaders() });
     if (response.ok) {
       setStatus(await response.json() as NotificationStatus);
       setMessage("Permintaan pairing dikirim. Scan QR WhatsApp di bawah.");
@@ -62,14 +64,15 @@ export function OwnerSettings() {
   };
 
   const disconnectWhatsApp = async () => {
-    if (!ownerId || !window.confirm("Putuskan koneksi WhatsApp sementara? Sesi tetap disimpan untuk koneksi berikutnya.")) return;
+    if (!ownerId) return;
     setLoading(true);
-    const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/notification/disconnect`, { method: "POST", headers: authHeaders() });
+    const response = await apiFetch(`${API_URL}/dashboard/owner/${ownerId}/notification/disconnect`, { method: "POST", headers: authHeaders() });
     if (response.ok) {
       setStatus((current) => current ? { ...current, status: "disconnected" } : { status: "disconnected" });
       setMessage("WhatsApp berhasil diputuskan. Sesi tetap tersimpan.");
     } else setMessage("WhatsApp gagal diputuskan.");
     setLoading(false);
+    setShowDisconnectConfirm(false);
   };
 
   const saveNotificationPhone = async () => {
@@ -79,7 +82,7 @@ export function OwnerSettings() {
       setMessage("Pilih nomor WhatsApp owner yang valid.");
       return;
     }
-    const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/notification/phone`, {
+    const response = await apiFetch(`${API_URL}/dashboard/owner/${ownerId}/notification/phone`, {
       method: "PUT",
       headers: { ...authHeaders(), "content-type": "application/json" },
       body: JSON.stringify({ phone }),
@@ -101,7 +104,7 @@ export function OwnerSettings() {
       return;
     }
     setLoading(true);
-    const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/notification/test`, {
+    const response = await apiFetch(`${API_URL}/dashboard/owner/${ownerId}/notification/test`, {
       method: "POST",
       headers: { ...authHeaders(), "content-type": "application/json" },
       body: JSON.stringify({ recipient: phone, scenario }),
@@ -119,11 +122,12 @@ export function OwnerSettings() {
         <label className="mt-6 block text-sm font-semibold">Nomor owner untuk notifikasi<select value={notificationPhone} onChange={(event) => setNotificationPhone(event.target.value)} className="mt-2 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2"><option value={status?.ownerPhone || ""}>{status?.ownerPhone || "Nomor owner belum tersedia"}</option><option value="">Pilih nomor lain</option></select><span className="mt-1 block text-xs font-normal text-[#765e52]">Nomor ini menerima pengingat invoice dan notifikasi pembayaran.</span></label>
         <div className="mt-2 flex gap-2"><input type="text" inputMode="tel" value={notificationPhone} onChange={(event) => setNotificationPhone(event.target.value)} placeholder="628123456789" className="min-w-0 flex-1 rounded-lg border border-[#caa897] bg-white px-3 py-2 outline-none focus:border-[#694536]" /><button type="button" onClick={() => void saveNotificationPhone()} className="rounded-lg border border-[#caa897] px-3 py-2 text-sm font-semibold">Simpan nomor</button></div>
         <label className="mt-4 block text-sm font-semibold">Nomor tujuan notifikasi tes<input type="text" inputMode="tel" value={testPhone} onChange={(event) => setTestPhone(event.target.value)} placeholder="628123456789" className="mt-2 w-full rounded-lg border border-[#caa897] bg-white px-3 py-2 outline-none focus:border-[#694536]" /><span className="mt-1 block text-xs font-normal text-[#765e52]">Gunakan kode negara, contoh: 628123456789.</span></label>
-        <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => void startPairing()} disabled={loading} className="rounded-lg bg-[#694536] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{loading ? "Menghubungkan..." : "Pairing ulang"}</button><button type="button" onClick={() => void disconnectWhatsApp()} disabled={loading || status?.status !== "open"} className="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50">Disconnect</button><button type="button" onClick={() => void sendTestNotification("cash_request")} disabled={loading || status?.status !== "open" || !(testPhone || notificationPhone).trim()} className="rounded-lg border border-[#caa897] px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50">Tes request cash</button><button type="button" onClick={() => void sendTestNotification("transaction_success")} disabled={loading || status?.status !== "open" || !(testPhone || notificationPhone).trim()} className="rounded-lg border border-[#caa897] px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50">Tes transaksi berhasil</button></div>
+        <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => void startPairing()} disabled={loading} className="rounded-lg bg-[#694536] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{loading ? "Menghubungkan..." : "Pairing ulang"}</button><button type="button" onClick={() => setShowDisconnectConfirm(true)} disabled={loading || status?.status !== "open"} className="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50">Disconnect</button><button type="button" onClick={() => void sendTestNotification("cash_request")} disabled={loading || status?.status !== "open" || !(testPhone || notificationPhone).trim()} className="rounded-lg border border-[#caa897] px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50">Tes request cash</button><button type="button" onClick={() => void sendTestNotification("transaction_success")} disabled={loading || status?.status !== "open" || !(testPhone || notificationPhone).trim()} className="rounded-lg border border-[#caa897] px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50">Tes transaksi berhasil</button></div>
         {status?.pairedNumber && <p className="mt-4 text-sm text-[#765e52]">Nomor terhubung: <b>{status.pairedNumber}</b></p>}
       </div>
       <div className="rounded-2xl border border-[#d7b9a9] bg-[#fffaf5] p-5 text-center sm:p-6"><h3 className="text-lg font-bold">QR WhatsApp</h3>{status?.qr ? <><div className="mx-auto mt-4 flex min-h-[276px] items-center justify-center rounded-xl bg-white p-2"><canvas ref={qrCanvas} aria-label="QR code WhatsApp pairing" className="max-w-full" /></div><p className="mt-3 text-xs text-[#765e52]">Scan QR ini dengan WhatsApp. QR diperbarui otomatis setiap beberapa detik.</p></> : <div className="mt-4 rounded-xl border border-dashed border-[#caa897] p-10 text-sm text-[#765e52]">{status?.status === "open" ? "WhatsApp sudah terhubung." : "Klik Minta pairing baru untuk menampilkan QR."}</div>}</div>
     </section>
     <section className="mt-5 rounded-2xl border border-[#d7b9a9] bg-[#fffaf5] p-5 sm:p-6"><h3 className="font-bold">Notifikasi yang aktif</h3><div className="mt-4 grid gap-3 text-sm sm:grid-cols-2"><div className="rounded-xl bg-[#f8eee7] p-4"><b>Pengingat tagihan</b><p className="mt-1 text-xs text-[#765e52]">H-7 dan hari jatuh tempo</p></div><div className="rounded-xl bg-[#f8eee7] p-4"><b>Pembayaran diterima</b><p className="mt-1 text-xs text-[#765e52]">Dikirim kepada pemilik kost</p></div></div></section>
+    {showDisconnectConfirm && <ConfirmDialog title="Putuskan WhatsApp?" message="Sesi WhatsApp tetap disimpan dan dapat digunakan kembali." confirmLabel="Putuskan" onClose={() => setShowDisconnectConfirm(false)} onConfirm={() => void disconnectWhatsApp()} />}
   </>;
 }

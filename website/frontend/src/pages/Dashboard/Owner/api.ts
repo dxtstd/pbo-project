@@ -1,14 +1,14 @@
-import { API_URL, authHeaders } from "../../../config";
+import { API_URL, apiFetch, authHeaders } from "../../../config";
 import type { OwnerData } from "./types";
 
 export const loadOwnerDashboard = async (ownerId: string): Promise<OwnerData> => {
-  const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}`, { headers: authHeaders() });
+  const response = await apiFetch(`${API_URL}/dashboard/owner/${ownerId}`, { headers: authHeaders() });
   if (!response.ok) throw new Error("Dashboard owner tidak dapat dimuat");
   return response.json() as Promise<OwnerData>;
 };
 
 export const createRoom = async (ownerId: string, payload: { name: string; type: string; price: number; withFurniture: boolean }) => {
-  const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/rooms`, {
+  const response = await apiFetch(`${API_URL}/dashboard/owner/${ownerId}/rooms`, {
     method: "POST",
     headers: { ...authHeaders(), "content-type": "application/json" },
     body: JSON.stringify(payload),
@@ -20,7 +20,7 @@ export const createRoom = async (ownerId: string, payload: { name: string; type:
 };
 
 export const updateRoom = async (ownerId: string, roomId: string, payload: { name: string; type: string; price: number; withFurniture: boolean }) => {
-  const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/rooms/${roomId}`, {
+  const response = await apiFetch(`${API_URL}/dashboard/owner/${ownerId}/rooms/${roomId}`, {
     method: "PATCH",
     headers: { ...authHeaders(), "content-type": "application/json" },
     body: JSON.stringify(payload),
@@ -32,7 +32,7 @@ export const updateRoom = async (ownerId: string, roomId: string, payload: { nam
 };
 
 export const deleteRoom = async (ownerId: string, roomId: string) => {
-  const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/rooms/${roomId}`, {
+  const response = await apiFetch(`${API_URL}/dashboard/owner/${ownerId}/rooms/${roomId}`, {
     method: "DELETE",
     headers: authHeaders(),
   });
@@ -43,7 +43,7 @@ export const deleteRoom = async (ownerId: string, roomId: string) => {
 };
 
 export const assignRoomCustomer = async (ownerId: string, roomId: string, payload: { customerId: string | null; rentalStartDate?: string; monthlyDueDay?: number; rentalMonths?: number; forceMove?: boolean }) => {
-  const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/rooms/${roomId}/customer`, {
+  const response = await apiFetch(`${API_URL}/dashboard/owner/${ownerId}/rooms/${roomId}/customer`, {
     method: "PATCH",
     headers: { ...authHeaders(), "content-type": "application/json" },
     body: JSON.stringify(payload),
@@ -64,7 +64,7 @@ export type CustomerPayload = {
 };
 
 const customerRequest = async (url: string, method: string, payload?: CustomerPayload) => {
-  const response = await fetch(url, {
+  const response = await apiFetch(url, {
     method,
     headers: { ...authHeaders(), "content-type": "application/json" },
     body: payload ? JSON.stringify(payload) : undefined,
@@ -85,12 +85,12 @@ export const deleteCustomer = (ownerId: string, customerId: string) =>
   customerRequest(`${API_URL}/dashboard/owner/${ownerId}/customers/${customerId}`, "DELETE");
 
 export const confirmCash = async (transactionId: string) => {
-  const response = await fetch(`${API_URL}/payment/cash/${transactionId}/confirm`, { method: "POST", headers: authHeaders() });
+  const response = await apiFetch(`${API_URL}/payment/cash/${transactionId}/confirm`, { method: "POST", headers: authHeaders() });
   if (!response.ok) throw new Error("Pembayaran cash gagal dikonfirmasi");
 };
 
 export const updateInvoice = async (ownerId: string, invoiceNumber: string, payload: { amount?: number; dueDate?: string }) => {
-  const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/invoices/${encodeURIComponent(invoiceNumber)}`, {
+  const response = await apiFetch(`${API_URL}/dashboard/owner/${ownerId}/invoices/${encodeURIComponent(invoiceNumber)}`, {
     method: "PATCH",
     headers: { ...authHeaders(), "content-type": "application/json" },
     body: JSON.stringify(payload),
@@ -99,6 +99,6 @@ export const updateInvoice = async (ownerId: string, invoiceNumber: string, payl
 };
 
 export const deleteInvoice = async (ownerId: string, invoiceNumber: string) => {
-  const response = await fetch(`${API_URL}/dashboard/owner/${ownerId}/invoices/${encodeURIComponent(invoiceNumber)}`, { method: "DELETE", headers: authHeaders() });
+  const response = await apiFetch(`${API_URL}/dashboard/owner/${ownerId}/invoices/${encodeURIComponent(invoiceNumber)}`, { method: "DELETE", headers: authHeaders() });
   if (!response.ok) throw new Error((await response.json().catch(() => ({})) as { message?: string }).message || "Invoice gagal dihapus");
 };

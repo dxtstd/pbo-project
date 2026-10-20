@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { API_URL, authHeaders } from "../../../config";
+import { API_URL, apiFetch, authHeaders } from "../../../config";
 
 export function CustomerPayment() {
   const [invoice, setInvoice] = useState<{ invoiceNumber: string; amount: number; status: string }>();
@@ -14,7 +14,7 @@ export function CustomerPayment() {
   useEffect(() => {
     const customerId = localStorage.getItem("userId");
     if (!customerId) return;
-    fetch(`${API_URL}/dashboard/customer/${customerId}`, { headers: authHeaders() }).then((response) => response.ok ? response.json() : Promise.reject()).then((data: { room?: object; invoices: NonNullable<typeof invoice>[]; transactions?: { transactionId: string; invoiceNumber?: string; status: string; expiresAt?: string; paymentMethod?: string; paymentActions?: { name: string; url: string }[]; vaNumbers?: { bank: string; va_number: string }[] }[] }) => {
+    apiFetch(`${API_URL}/dashboard/customer/${customerId}`, { headers: authHeaders() }).then((response) => response.ok ? response.json() : Promise.reject()).then((data: { room?: object; invoices: NonNullable<typeof invoice>[]; transactions?: { transactionId: string; invoiceNumber?: string; status: string; expiresAt?: string; paymentMethod?: string; paymentActions?: { name: string; url: string }[]; vaNumbers?: { bank: string; va_number: string }[] }[] }) => {
       const unpaid = data.invoices.find((item) => ["pending", "unpaid", "overdue"].includes(item.status));
       if (unpaid) setInvoice(unpaid);
       setHasRoom(Boolean(data.room));
@@ -38,7 +38,7 @@ export function CustomerPayment() {
     }
     const endpoint = method === "cash" ? "/payment/cash" : "/payment/charge";
     const body = method === "cash" ? { invoiceNumber: invoice.invoiceNumber } : { invoiceNumber: invoice.invoiceNumber, paymentType: method };
-    const response = await fetch(`${API_URL}${endpoint}`, { method: "POST", headers: { "content-type": "application/json", ...authHeaders() }, body: JSON.stringify(body) });
+    const response = await apiFetch(`${API_URL}${endpoint}`, { method: "POST", headers: { "content-type": "application/json", ...authHeaders() }, body: JSON.stringify(body) });
     const result = await response.json() as typeof paymentInfo & { redirectUrl?: string; transactionId?: string; status?: string; expiresAt?: string };
     if (response.ok && result.redirectUrl) window.location.assign(result.redirectUrl);
     else if (response.ok) {
@@ -56,7 +56,7 @@ export function CustomerPayment() {
       setMessage("Kamar hanya dapat ditentukan oleh pemilik kost.");
       return;
     }
-    const response = await fetch(`${API_URL}/dashboard/customer/${customerId}/invoices/extend`, {
+    const response = await apiFetch(`${API_URL}/dashboard/customer/${customerId}/invoices/extend`, {
       method: "POST",
       headers: { ...authHeaders(), "content-type": "application/json" },
       body: JSON.stringify({ months }),
@@ -72,7 +72,7 @@ export function CustomerPayment() {
 
   const cancelCash = async () => {
     if (!activeTransaction) return;
-    const response = await fetch(`${API_URL}/payment/cash/${activeTransaction.transactionId}/cancel`, { method: "POST", headers: authHeaders() });
+    const response = await apiFetch(`${API_URL}/payment/cash/${activeTransaction.transactionId}/cancel`, { method: "POST", headers: authHeaders() });
     if (response.ok) {
       setActiveTransaction(undefined);
       setMessage("Permintaan cash dibatalkan. Metode pembayaran lain sudah dapat dipilih.");

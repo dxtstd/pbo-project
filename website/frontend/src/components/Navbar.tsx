@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 export const Navbar = function(): React.ReactElement {
   const { pathname } = useLocation();
   const [activeSection, setActiveSection] = useState(window.location.hash.slice(1) || 'home');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isProgrammaticScroll = useRef(false);
   const scrollEndTimeout = useRef<number | undefined>(undefined);
 
@@ -45,6 +46,7 @@ export const Navbar = function(): React.ReactElement {
 
       event.preventDefault();
       setActiveSection(sectionId);
+      setIsMenuOpen(false);
       isProgrammaticScroll.current = true;
       window.history.pushState(null, '', link.href);
       section.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -77,11 +79,16 @@ export const Navbar = function(): React.ReactElement {
   }, [pathname]);
 
   return (
-    <nav className="sticky top-0 z-50 flex items-center justify-between gap-4 bg-[#F5EBE6] px-4 py-4 shadow-sm sm:px-8 md:px-12 md:py-6">
+    <nav className="sticky top-0 z-50 bg-[#F5EBE6] px-4 py-4 shadow-sm sm:px-8 md:px-12 md:py-6">
+      <div className="flex items-center justify-between gap-4">
       <div className="shrink-0 font-serif text-lg font-bold text-[#4A3B32] sm:text-xl">
         Kost Lorem Ipsum
       </div>
-      <div className="flex items-center gap-3 text-sm font-medium text-[#4A3B32] sm:gap-5 md:gap-8 md:text-base">
+      <button type="button" aria-expanded={isMenuOpen} aria-controls="public-navigation" onClick={() => setIsMenuOpen((open) => !open)} className="rounded-lg border border-[#caa897] px-3 py-2 text-sm font-semibold text-[#4A3B32] md:hidden">
+        {isMenuOpen ? "Tutup" : "Menu"}
+      </button>
+      </div>
+      <div id="public-navigation" className={`${isMenuOpen ? "mt-4 flex" : "hidden"} flex-col gap-2 text-sm font-medium text-[#4A3B32] md:mt-0 md:flex md:flex-row md:items-center md:justify-end md:gap-8 md:text-base`}>
 
         <a
           href="/#home"
@@ -106,6 +113,7 @@ export const Navbar = function(): React.ReactElement {
 
         <Link
           to="/login"
+          onClick={() => setIsMenuOpen(false)}
           className="rounded-md bg-[#5C4033] px-3 py-2 text-white shadow transition hover:bg-[#4A3B32] sm:px-5"
         >
           Log In

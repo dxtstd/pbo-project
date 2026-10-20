@@ -1,6 +1,8 @@
 import Customer from "../models/customer";
 import Invoice from "../models/invoice";
 import Room from "../models/room";
+import Owner from "../models/owner";
+import { publishInvoiceCreated } from "./notification";
 
 const addMonths = (date: Date, months: number): Date => {
   const result = new Date(date);
@@ -30,8 +32,8 @@ export const createInvoiceForPeriod = async (input: {
     throw new Error("Durasi invoice harus antara 1 sampai 12 bulan");
   }
   const [customer, room] = await Promise.all([
-    Customer.findOne({ customerId: input.customerId }).select("firstname lastname").lean(),
-    Room.findOne({ roomId: input.roomId }).select("name price").lean(),
+    Customer.findOne({ customerId: input.customerId }).select("firstname lastname phoneNumber").lean(),
+    Room.findOne({ roomId: input.roomId }).select("name price ownerId").lean(),
   ]);
   if (!customer || !room) throw new Error("Customer atau kamar tidak ditemukan");
   const endDate = addMonths(input.startDate, input.months - 1);
@@ -45,7 +47,7 @@ export const createInvoiceForPeriod = async (input: {
   if (existing) return existing;
 
   const amount = room.price * input.months;
-  return Invoice.create({
+  const invoice = await Invoice.create({
     invoiceNumber: `INV-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
     customerId: input.customerId,
     roomId: input.roomId,
@@ -61,6 +63,21 @@ export const createInvoiceForPeriod = async (input: {
     periodEndDate: endDate,
     periodMonths: input.months,
   });
+  const owner = room.ownerId
+    ? await Owner.findOne({ ownerId: room.ownerId }).select("firstname lastname").lean()
+    : undefined;
+  if (owner && customer.phoneNumber) {
+    publishInvoiceCreated({
+      invoiceNumber: invoice.invoiceNumber,
+      customerName: `${customer.firstname} ${customer.lastname}`.trim(),
+      customerPhone: customer.phoneNumber,
+      amount: invoice.amount,
+      dueDate: invoice.dueDate.toISOString().slice(0, 10),
+    });
+  } else {
+    console.error(`Cannot notify invoice ${invoice.invoiceNumber}: owner or customer phone not found`);
+  }
+  return invoice;
 };
 
 export const createNextInvoice = async (invoice: {

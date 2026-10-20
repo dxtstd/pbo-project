@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { API_URL, authHeaders } from "../../../config";
+import { API_URL, apiFetch, authHeaders } from "../../../config";
 import { downloadInvoicePdf } from "../../../utils/invoiceGenerator";
 import { Toast } from "../../../components/Toast";
 import { useAuthStore } from "../../../stores/auth";
@@ -33,7 +33,7 @@ export function CustomerDashboard() {
 
   useEffect(() => {
     if (!customerId) { navigate("/login"); return; }
-    fetch(`${API_URL}/dashboard/customer/${customerId}`, { headers: authHeaders() })
+    apiFetch(`${API_URL}/dashboard/customer/${customerId}`, { headers: authHeaders() })
       .then((response) => response.ok ? response.json() as Promise<CustomerDashboard> : Promise.reject(new Error("demo")))
       .then(setData)
       .catch(() => navigate("/login"));
@@ -49,7 +49,7 @@ export function CustomerDashboard() {
   const remainingMonths = remainingDays === undefined ? undefined : Math.floor(remainingDays / 30);
   const submitCash = async () => {
     if (!invoice) return;
-    const response = await fetch(`${API_URL}/payment/cash`, {
+    const response = await apiFetch(`${API_URL}/payment/cash`, {
       method: "POST",
       headers: { "content-type": "application/json", ...authHeaders() },
       body: JSON.stringify({ invoiceNumber: invoice.invoiceNumber }),
@@ -59,7 +59,7 @@ export function CustomerDashboard() {
 
   const payOnline = async (paymentType: "qris" | "bank_transfer") => {
     if (!invoice) return;
-    const response = await fetch(`${API_URL}/payment/charge`, {
+    const response = await apiFetch(`${API_URL}/payment/charge`, {
       method: "POST",
       headers: { "content-type": "application/json", ...authHeaders() },
       body: JSON.stringify({ invoiceNumber: invoice.invoiceNumber, paymentType }),
