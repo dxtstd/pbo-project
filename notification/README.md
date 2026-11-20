@@ -1,30 +1,99 @@
-# pbo-kost-notif
+# Worker Notifikasi PBO Kost
 
-The notification service listens on port `4000` by default. Its health endpoint
-is available at `/health`; when deployed with the root Compose stack, it is
-reachable through the Nginx reverse proxy at `/notification/`.
+Worker notifikasi bertugas menghubungkan backend PBO Kost dengan WhatsApp
+melalui Zapo.js. Worker menerima event dari backend melalui WebSocket dan
+mengirim pesan kepada customer atau owner.
 
-## Persistent WhatsApp session
+**Bahasa:** Indonesia (utama) | [English](README_en.md)
+Dokumentasi workspace: [README utama](../README.md)
 
-Zapo stores its authentication state in `/app/.auth/state.sqlite`. The
-production Compose file mounts this directory to the named `zapo-auth` volume,
-so restarting or recreating the notification container does not require
-pairing again.
+## Tanggung Jawab
 
-The owner notification settings expose two controls:
+- Menyimpan sesi autentikasi WhatsApp pada SQLite.
+- Menampilkan QR code untuk pairing awal.
+- Mengirim notifikasi invoice baru, pengingat H-7/jatuh tempo, permintaan
+  pembayaran cash, pembayaran berhasil, dan permintaan perpanjangan.
+- Menyediakan endpoint untuk status, pairing ulang, disconnect, dan pengujian
+  notifikasi.
+- Menerima event otomatis dari backend melalui WebSocket internal.
 
-- **Disconnect** closes the current connection while preserving the saved
-  session.
-- **Pairing ulang** logs out and clears the saved session, then starts a fresh
-  QR pairing flow.
+## Endpoint HTTP
 
-The notification service keeps its internal Docker hostname (`notification`)
-for backend requests. Nginx also proxies `/notification/` to that service
-instead of targeting a container IP, so changing container IPs does not make
-the reverse proxy stale.
+Worker berjalan pada port `4000` secara default:
 
-The notification Docker images install Python, Make, and g++ because
-`better-sqlite3` may fall back to compiling through `node-gyp` when its
-prebuilt binary is unavailable. Python 3 is configured explicitly for npm.
-Dependency installation uses the lockfile, and Docker can reuse the dependency
-layer whenever the package manifests are unchanged.
+| Method | Path | Keterangan |
+| --- | --- | --- |
+| `GET` | `/health` | Health check service |
+| `GET` | `/status` | Status koneksi dan QR pairing |
+| `POST` | `/pair` | Hapus sesi dan mulai pairing baru |
+| `POST` | `/disconnect` | Putuskan koneksi tanpa menghapus sesi |
+| `POST` | `/test` | Kirim pesan uji dengan payload `recipient` dan `message` |
+| `POST` | `/event` | Terima event notifikasi dari backend |
+
+Endpoint tersebut digunakan oleh backend dan dashboard owner. Jangan
+mengekspos worker secara langsung ke internet tanpa pengamanan tambahan.
+
+## Konfigurasi Environment
+
+Salin `.env.development.example` menjadi `.env.development`:
+
+```env
+NODE_ENV=development
+PORT=4000
+ZAPO_SESSION_ID=kost-notification-dev
+LOG_LEVEL=debug
+ZAPO_STORE_PATH=.auth/state.sqlite
+```
+
+- `ZAPO_SESSION_ID` membedakan sesi WhatsApp.
+- `ZAPO_STORE_PATH` adalah lokasi penyimpanan kredensial dan state sesi.
+- `LOG_LEVEL` mengatur tingkat detail log.
+
+Jangan commit folder `.auth` atau file SQLite sesi.
+
+## Menjalankan Secara Lokal
+
+Dari root repository:
+
+```sh
+npm install
+npm run dev:notification
+```
+
+Atau dari direktori ini:
+
+```sh
+npm install
+npm run dev
+```
+
+Saat worker mulai pertama kali, scan QR code yang ditampilkan di terminal.
+Setelah pairing berhasil, sesi disimpan sesuai `ZAPO_STORE_PATH`.
+
+## Menjalankan dengan Docker
+
+Mode development:
+
+```sh
+docker compose -f ../docker-compose.dev.yml up --build notification
+```
+
+Mode production dijalankan bersama seluruh stack:
+
+```sh
+docker compose up --build
+```
+
+Compose production menggunakan volume `zapo-auth` pada `/app/.auth`, sehingga
+container dapat dibuat ulang tanpa pairing ulang.
+
+## Perintah
+
+```sh
+npm run dev    # Worker dengan tsx watch
+npm run start  # Menjalankan worker tanpa watch
+```
+
+Library `better-sqlite3` dapat membutuhkan Python, Make, dan g++ ketika binary
+prebuilt tidak tersedia. Dockerfile worker sudah menyiapkan kebutuhan build
+tersebut.
