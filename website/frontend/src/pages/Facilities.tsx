@@ -26,17 +26,17 @@ export const Facilities = function ({ title, description }: { title?: string; de
 
         {/* Grid 4 Kolom Sejajar (grid-cols-1 di HP, sm:grid-cols-2 di tablet, lg:grid-cols-4 di laptop) */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8 xl:gap-10 2xl:gap-12">
-          <div className="overflow-hidden rounded-xl bg-white shadow-md">
-            <img src="/img/facilities.png" alt="Fasilitas 1" className="aspect-square w-full object-cover" />
+           <div className="overflow-hidden rounded-xl shadow-md">
+            <img src="/img/facilities5.png" alt="Fasilitas 1" className="aspect-square w-full object-cover" />
           </div>
-          <div className="overflow-hidden rounded-xl bg-white shadow-md">
+          <div className="overflow-hidden rounded-xl shadow-md">
             <img src="/img/facilities2.png" alt="Fasilitas 2" className="aspect-square w-full object-cover" />
           </div>
-          <div className="overflow-hidden rounded-xl bg-white shadow-md">
-            <img src="/img/facilities3.png" alt="Fasilitas 3" className="aspect-square w-full object-cover" />
+          <div className="overflow-hidden rounded-xl shadow-md">
+            <img src="/img/facilities6.png" alt="Fasilitas 3" className="aspect-square w-full object-cover" />
           </div>
-          <div className="overflow-hidden rounded-xl bg-white shadow-md">
-            <img src="/img/facilities4.png" alt="Fasilitas 4" className="aspect-square w-full object-cover" />
+          <div className="overflow-hidden rounded-xl shadow-md">
+            <img src="/img/facilities7.png" alt="Fasilitas 4" className="aspect-square w-full object-cover" />
           </div>
         </div>
       </div>
