@@ -1,75 +1,93 @@
-# React + TypeScript + Vite
+# Frontend PBO Kost
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend aplikasi PBO Kost dibangun dengan React dan TypeScript. Aplikasi ini
+menyediakan halaman publik, login, dashboard customer, dashboard owner, dan
+dashboard admin.
 
-Currently, two official plugins are available:
+**Bahasa:** Indonesia (utama) | [English](README_en.md)
+Dokumentasi workspace: [README utama](../../README.md)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Fitur
 
-## React Compiler
+- Halaman beranda, fasilitas, dan kontak.
+- Login dengan pengalihan berdasarkan peran pengguna.
+- Dashboard customer untuk melihat kamar, tagihan, riwayat transaksi, dan
+  pembayaran.
+- Dashboard owner untuk mengelola kamar, customer, pembayaran, rekap bulanan,
+  laporan, serta pengaturan notifikasi.
+- Dashboard admin untuk pengelolaan konfigurasi dan notifikasi.
+- Proteksi route berdasarkan peran (`admin`, `owner`, dan `customer`).
+- Pembuatan dan pengunduhan invoice PDF.
+- Tampilan responsif dengan Tailwind CSS.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Teknologi
 
-## Expanding the ESLint configuration
+- React 19
+- TypeScript
+- Vite
+- React Router
+- Tailwind CSS
+- Zustand
+- QRCode
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Struktur Source
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```text
+src/
+├── components/     # Komponen bersama dan route protection
+├── pages/          # Halaman publik, admin, customer, dan owner
+├── stores/         # State autentikasi dan data aplikasi
+├── utils/          # Utilitas, termasuk generator invoice
+├── config.ts       # URL API, URL notifikasi, dan helper request
+├── App.tsx         # Konfigurasi route utama
+└── main.tsx        # Entry point aplikasi
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+## Menjalankan Secara Lokal
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Dari root repository:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```sh
+npm install
+npm run dev:website
 ```
+
+Atau dari direktori ini:
+
+```sh
+npm install
+npm run dev
+```
+
+Vite akan menjalankan frontend pada `http://localhost:5173`. Saat memakai
+`npm run dev`, frontend diakses melalui reverse proxy pada
+`http://localhost:8080`.
+
+## Environment
+
+Salin `.env.development.example` menjadi `.env.development`:
+
+```env
+VITE_API_URL=http://localhost:3000/api/v1
+VITE_NOTIFICATION_URL=http://localhost:4000
+```
+
+Pada mode development, nilai tersebut memiliki fallback yang sama. Pada
+production, `VITE_API_URL` dan `VITE_NOTIFICATION_URL` wajib dikonfigurasi.
+Dengan Docker Compose production, frontend menggunakan path reverse proxy:
+
+```env
+VITE_API_URL=/api/v1
+VITE_NOTIFICATION_URL=/notification
+```
+
+## Perintah
+
+```sh
+npm run dev      # Development server dengan HMR
+npm run build    # Type-check dan build production
+npm run lint     # Jalankan ESLint
+npm run preview  # Preview hasil build
+```
+
+Build frontend menghasilkan output pada direktori `dist/`.
