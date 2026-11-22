@@ -18,9 +18,9 @@ export const Home = function (): React.ReactElement {
             <img src="/img/kost.png" alt="Kost Lorem Ipsum" className="aspect-[16/10] w-full rounded-lg object-contain" />
           </div>
           <div className="w-full max-w-xl space-y-5 text-center md:text-left lg:max-w-xl lg:space-y-5 xl:max-w-2xl xl:space-y-7 2xl:max-w-3xl">
-            <h1 className="font-serif text-3xl  font-bold text-[#4A3B32] sm:text-4xl lg:text-4xl xl:text-5xl 2xl:text-6xl">{content?.heroTitle || "Kost Lorem Ipsum"}</h1>
+            <h1 className="font-serif text-3xl  font-bold text-[#4A3B32] sm:text-4xl lg:text-4xl xl:text-5xl 2xl:text-6xl">{content?.heroTitle || "Kost Camp M2"}</h1>
             <p className="text-sm leading-relaxed text-[#6B5B52] lg:text-base xl:text-lg">
-              {content?.heroDescription || "Tinggal dan suasana yang nyaman di Kost Lorem Ipsum. Lokasi strategis dengan fasilitas lengkap yang dirancang untuk memberikan kenyamanan dan ketenangan Anda."}
+              {content?.heroDescription || "Tinggal dan suasana yang nyaman di Kost Camp M2. Lokasi strategis dengan fasilitas lengkap yang dirancang untuk memberikan kenyamanan dan ketenangan Anda."}
             </p>
             <button
               onClick={() => { window.location.href = "/login" }}
