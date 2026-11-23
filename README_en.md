@@ -129,7 +129,8 @@ production uses the `zapo-auth` Docker volume.
 
 ## Test Account and Demo
 
-- **Public demo URL:** Not available yet.
+- **Live demo:** [Watch the application demo](https://youtu.be/Upphza8kXHc).
+- **Public demo URL:** [https://kost.dxtstd.my.id](https://kost.dxtstd.my.id).
 - **Local admin username:** `admin` (configurable with `ADMIN_USERNAME`).
 - **Local admin password:** configured with `ADMIN_PASSWORD`; never store a
   real password in the repository.
