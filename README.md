@@ -133,12 +133,10 @@ production menggunakan volume Docker `zapo-auth`.
 - **Live demo:** [Tonton demo aplikasi](https://youtu.be/Upphza8kXHc).
 - **URL demo publik:** [https://kost.dxtstd.my.id](https://kost.dxtstd.my.id).
 - **Username admin lokal:** `admin` (dapat diubah melalui `ADMIN_USERNAME`).
-- **Password admin lokal:** ditentukan melalui `ADMIN_PASSWORD`; jangan
-  menyimpan password nyata di repository.
+- **Password admin lokal:** ditentukan melalui `ADMIN_PASSWORD`.
 
-Jika aplikasi dideploy untuk penilaian, tambahkan URL publik dan kredensial
-akun uji yang aktif pada bagian ini atau pada dokumen laporan. Jangan gunakan
-akun pribadi atau secret produksi.
+Kredensial akun uji terdapat pada laporan. Karena mengandung informasi sensitif,
+kredensial tersebut tidak dipublikasikan pada README ini.
 
 Rute utama dashboard:
 

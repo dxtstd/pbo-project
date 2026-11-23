@@ -132,12 +132,10 @@ production uses the `zapo-auth` Docker volume.
 - **Live demo:** [Watch the application demo](https://youtu.be/Upphza8kXHc).
 - **Public demo URL:** [https://kost.dxtstd.my.id](https://kost.dxtstd.my.id).
 - **Local admin username:** `admin` (configurable with `ADMIN_USERNAME`).
-- **Local admin password:** configured with `ADMIN_PASSWORD`; never store a
-  real password in the repository.
+- **Local admin password:** configured with `ADMIN_PASSWORD`.
 
-When deploying the application for evaluation, add a public URL and active test
-credentials here or in the project report. Do not use personal accounts or
-production secrets.
+Test account credentials are provided in the project report. They are not
+published in this README because they contain sensitive information.
 
 Main dashboard routes:
 
