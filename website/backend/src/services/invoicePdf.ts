@@ -83,7 +83,7 @@ export const generateInvoicePdf = async (invoice: InvoicePdfData): Promise<Uint8
           <main class="page">
             <div class="topbar"></div>
             <header class="header">
-              <div><div class="brand">Kost Lorem Ipsum</div><div class="subtitle">Hunian nyaman, pembayaran tertata</div></div>
+              <div><div class="brand">Kost Camp M2</div><div class="subtitle">Hunian nyaman, pembayaran tertata</div></div>
               <div class="title"><h1>INVOICE</h1><p>${escapeHtml(invoice.invoiceNumber)}</p></div>
             </header>
             <section class="meta">
@@ -95,8 +95,8 @@ export const generateInvoicePdf = async (invoice: InvoicePdfData): Promise<Uint8
             </tbody></table>
             <div class="summary"><div class="summary-row"><span>Subtotal</span><strong>${amount}</strong></div><div class="summary-row"><span>Biaya tambahan</span><strong>Rp 0</strong></div><div class="grand-total"><span>Total</span><span>${amount}</span></div></div>
             <div class="status">Status: ${escapeHtml(statusLabel)}</div>
-            <div class="note"><strong>Catatan pembayaran</strong><br>Mohon lakukan pembayaran sesuai nominal invoice. Simpan dokumen ini sebagai bukti tagihan. Invoice ini dibuat secara otomatis oleh sistem Kost Lorem Ipsum.</div>
-            <footer class="footer">Terima kasih telah menjadi bagian dari Kost Lorem Ipsum · Dokumen resmi sistem</footer>
+            <div class="note"><strong>Catatan pembayaran</strong><br>Mohon lakukan pembayaran sesuai nominal invoice. Simpan dokumen ini sebagai bukti tagihan. Invoice ini dibuat secara otomatis oleh sistem Kost Camp M2.</div>
+            <footer class="footer">Terima kasih telah menjadi bagian dari Kost Camp M2 · Dokumen resmi sistem</footer>
           </main>
         </body>
       </html>`;

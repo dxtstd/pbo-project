@@ -27,7 +27,7 @@ export function AdminDashboard() {
   const [ownerToDelete, setOwnerToDelete] = useState<string>();
   const [recipients, setRecipients] = useState<RecipientData>({ status: {}, owners: [], customers: [] });
   const [testRecipient, setTestRecipient] = useState("");
-  const [testMessage, setTestMessage] = useState("Halo dari Kost Lorem Ipsum. Ini adalah pesan testing notifikasi WhatsApp.");
+  const [testMessage, setTestMessage] = useState("Halo dari Kost Camp M2. Ini adalah pesan testing notifikasi WhatsApp.");
   const [testEvent, setTestEvent] = useState("invoice_due");
   const [testAudience, setTestAudience] = useState<"owner" | "customer">("customer");
   const [notificationTemplates, setNotificationTemplates] = useState<NotificationTemplate[]>([]);
@@ -124,7 +124,7 @@ export function AdminDashboard() {
     <main className="min-h-screen bg-[#efe2d6] px-4 py-6 text-[#3e2f28] sm:px-8">
       <div className="mx-auto max-w-6xl">
         <header className="flex flex-wrap items-center justify-between gap-4">
-          <div><p className="text-sm text-[#765e52]">CMS Admin</p><h1 className="font-serif text-3xl font-bold">Kost Lorem Ipsum</h1></div>
+          <div><p className="text-sm text-[#765e52]">CMS Admin</p><h1 className="font-serif text-3xl font-bold">Kost Camp M2</h1></div>
           <div className="flex items-center gap-3"><div className="text-right"><p className="font-semibold">{adminUsername}</p><p className="text-sm text-[#765e52]">{adminUser?.email || "Email admin belum diatur"}</p></div><div className="grid h-11 w-11 place-items-center rounded-full bg-[#694536] font-bold text-white">{adminUsername.charAt(0).toUpperCase()}</div><button onClick={() => { logout(); navigate("/login", { replace: true }); }} className="rounded-lg border border-[#caa897] px-4 py-2 text-sm">Keluar</button></div>
         </header>
 

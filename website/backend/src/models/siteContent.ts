@@ -15,10 +15,10 @@ export interface ISiteContent extends Document {
 
 const SiteContentSchema = new Schema<ISiteContent>({
   key: { type: String, required: true, unique: true, default: "landing" },
-  siteName: { type: String, required: true, default: "Kost Lorem Ipsum" },
-  heroTitle: { type: String, required: true, default: "Kost Lorem Ipsum" },
+  siteName: { type: String, required: true, default: "Kost Camp M2" },
+  heroTitle: { type: String, required: true, default: "Kost Camp M2" },
   heroDescription: { type: String, required: true },
-  facilitiesTitle: { type: String, required: true, default: "Fasilitas Kost Lorem Ipsum" },
+  facilitiesTitle: { type: String, required: true, default: "Fasilitas Kost Camp M2" },
   facilitiesDescription: { type: String, required: true },
   contactTitle: { type: String, required: true, default: "Contact Us" },
   contactDescription: { type: String, required: true },

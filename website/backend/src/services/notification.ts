@@ -40,7 +40,7 @@ export const renderNotificationTemplate = async (event: NotificationTemplateKey,
   const business = await SiteContent.findOne({ key: "landing" }).select("siteName").lean();
   const renderedHeader = header.replace(/%([a-z_]+)%/g, (_match, key: string) => String(values[key] ?? (key === "name_business" ? business?.siteName : "")));
   const rendered = content.replace(/%([a-z_]+)%/g, (_match, key: string) => String(values[key] ?? (key === "name_business" ? business?.siteName : "")));
-  return `${values.name_business || business?.siteName || "Kost Lorem Ipsum"}\n=============\n${renderedHeader}\n\n${rendered}`;
+  return `${values.name_business || business?.siteName || "Kost Camp M2"}\n=============\n${renderedHeader}\n\n${rendered}`;
 };
 
 export const isNotificationCategoryEnabled = async (ownerId: string | undefined, category: NotificationCategory): Promise<boolean> => {

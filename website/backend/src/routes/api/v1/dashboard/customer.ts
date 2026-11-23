@@ -248,10 +248,10 @@ customerDashboard.post("/:customerId/notification/test", async (req, res) => {
   if (!customer || !invoice) return res.status(404).json({ message: "Data customer atau invoice tidak ditemukan" });
   const date = new Date(invoice.dueDate).toLocaleDateString("id-ID");
   const message = scenario === "h7"
-    ? `Kost Lorem Ipsum\nPENGINGAT TAGIHAN\nTagihan ${invoice.invoiceNumber} akan jatuh tempo pada ${date}.\nIni adalah pengingat H-7.`
+    ? `Kost Camp M2\nPENGINGAT TAGIHAN\nTagihan ${invoice.invoiceNumber} akan jatuh tempo pada ${date}.\nIni adalah pengingat H-7.`
     : scenario === "due_date"
-      ? `Kost Lorem Ipsum\nPEMBERITAHUAN\nHari ini adalah jatuh tempo tagihan ${invoice.invoiceNumber} sebesar Rp ${invoice.amount.toLocaleString("id-ID")}.`
-      : `Kost Lorem Ipsum\nPEMBAYARAN BERHASIL\nPembayaran invoice ${invoice.invoiceNumber} sebesar Rp ${invoice.amount.toLocaleString("id-ID")} berhasil diterima.`;
+      ? `Kost Camp M2\nPEMBERITAHUAN\nHari ini adalah jatuh tempo tagihan ${invoice.invoiceNumber} sebesar Rp ${invoice.amount.toLocaleString("id-ID")}.`
+      : `Kost Camp M2\nPEMBAYARAN BERHASIL\nPembayaran invoice ${invoice.invoiceNumber} sebesar Rp ${invoice.amount.toLocaleString("id-ID")} berhasil diterima.`;
   try {
     const response = await fetch(`${config.notificationHttpUrl}/test`, {
       method: "POST",

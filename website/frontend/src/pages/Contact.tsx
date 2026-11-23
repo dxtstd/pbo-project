@@ -25,7 +25,7 @@ export const Contact = function ({ title, description, location, whatsapp }: { t
           {title || "Contact Us"}
           </h2>
           <p className="mb-8 text-sm text-[#6C5A52]">
-            {description || "Hubungi kami untuk informasi lebih lanjut mengenai Kost Lorem Ipsum."}
+            {description || "Hubungi kami untuk informasi lebih lanjut mengenai Kost Camp M2."}
           </p>
         </div>
         <div className="grid gap-5 md:grid-cols-2">

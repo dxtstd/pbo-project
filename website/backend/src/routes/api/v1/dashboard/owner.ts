@@ -316,8 +316,8 @@ ownerDashboard.post("/:ownerId/notification/test", async (req, res) => {
       body: JSON.stringify({
         recipient: phone,
         message: scenario === "cash_request"
-          ? "Kost Lorem Ipsum\nPERMINTAAN PEMBAYARAN CASH\nAda customer yang meminta konfirmasi pembayaran cash. Silakan buka dashboard untuk memeriksa."
-          : "Kost Lorem Ipsum\nTRANSAKSI BERHASIL\nPembayaran customer berhasil diterima dan tercatat di sistem.",
+          ? "Kost Camp M2\nPERMINTAAN PEMBAYARAN CASH\nAda customer yang meminta konfirmasi pembayaran cash. Silakan buka dashboard untuk memeriksa."
+          : "Kost Camp M2\nTRANSAKSI BERHASIL\nPembayaran customer berhasil diterima dan tercatat di sistem.",
       }),
     });
     if (!response.ok) return res.status(502).json({ message: "Test notification could not be sent" });

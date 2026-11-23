@@ -147,7 +147,7 @@ admin.post("/notification/test-event", async (req, res) => {
         room_name: "Kamar Test",
         months: 1,
         dashboard_link: audience === "owner" ? "/dashboard/owner" : "/dashboard/customer/payment",
-        name_business: "Kost Lorem Ipsum",
+        name_business: "Kost Camp M2",
       }, audience);
       try {
         const response = await fetch(`${config.notificationHttpUrl}/test`, {

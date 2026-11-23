@@ -30,14 +30,14 @@ h1{margin:0 0 8px;color:#694536} .muted{color:#765e52}
 @media(max-width:600px){body{padding:12px}.invoice{padding:24px}.row{display:block}.row strong{display:block;margin-top:6px}}
 </style></head>
 <body><article class="invoice">
-<h1>Kost Lorem Ipsum</h1><p class="muted">Invoice pembayaran kost</p>
+<h1>Kost Camp M2</h1><p class="muted">Invoice pembayaran kost</p>
 <div class="row"><span>Nomor invoice</span><strong>${escapeHtml(invoice.invoiceNumber)}</strong></div>
 <div class="row"><span>Nama penghuni</span><strong>${escapeHtml(invoice.customerName || "-")}</strong></div>
 <div class="row"><span>Kamar</span><strong>${escapeHtml(invoice.roomName || "-")}</strong></div>
 <div class="row"><span>Jatuh tempo</span><strong>${new Date(invoice.dueDate).toLocaleDateString("id-ID")}</strong></div>
 <div class="row"><span>Status</span><strong class="status">${escapeHtml(invoice.status)}</strong></div>
 <div class="row total"><span>Total</span><strong>${money(invoice.amount)}</strong></div>
-<p class="muted">Dokumen ini dibuat oleh sistem Kost Lorem Ipsum.</p>
+<p class="muted">Dokumen ini dibuat oleh sistem Kost Camp M2.</p>
 </article></body></html>`;
   const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
   const link = document.createElement("a");
